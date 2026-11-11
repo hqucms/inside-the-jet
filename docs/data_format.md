@@ -163,7 +163,11 @@ These hold for every generated file (float32 tolerances, relative $10^{-5}$), an
 partons:   sum of truth_prong_* = resonance four-vector; the leading jet holds every decay parton
 W, top:    sum of truth_parton_* of the resonance = resonance four-vector (after the reshuffle)
 QCD:       sum of parton energies = seed energy; |sum p_perp| / E < 0.05 (a tolerance, not an identity)
-chains:    energy conserved per fragmentation chain; the kT kicks of a chain sum to 0
+chains:    energy conserved per fragmentation chain (in the W rest frame with singlet_frame); the kT kicks of a chain
+           sum to 0 (both before the hadron reshuffle)
+hadrons:   with hadron_reshuffle, the hadrons of every restored W and top with all decay products, neutrinos included,
+           sum to the parton-level resonance (relative 1e-8; the generator measures it, the file lacks the hadrons
+           outside the jet and the neutrinos: provenance["hadron_reshuffle"]["max_residual"])
 shower:    emission angles decrease along every branch; with coherence the first angle of every W prong <= theta_qq
 jet:       jet_nparticles == number of particles; particles pT-descending; |sum pT vector| == jet_pt
            part_deta == s (eta_i - eta_jet) (abs. 1e-5); |part_dphi| <= pi
@@ -183,9 +187,10 @@ truth:     -1 <= truth_part_prong <= truth_nprongs - 1; truth_part_prong == -1 i
 | `seed`, `first_event_id`, `chunk_size` | random seed, the id of the first jet, jets per chunk (1000) |
 | `workers` | worker processes (the output does not depend on it) |
 | `preset`, `processes`, `overrides`, `process_overrides` | the CLI preset, the process list, the changed options and the per-process changes (`--override`; absent for `--mystery`) |
-| `mystery` | only with `--mystery`: the planted shortcut, encoded (`jetgen info --reveal`) |
+| `mystery` | only with `--mystery`: the planted shortcut, scrambled with a key (`jetgen info --provenance` prints a placeholder, `jetgen info --reveal` decodes it) |
 | `containment_efficiency` | per process: the fraction of hard processes that passed containment |
 | `hadron_kt_capped` | fraction of hadrons whose transverse kick was capped |
+| `hadron_reshuffle` | the hadron-level reshuffle (`hadron_reshuffle`, also through a per-process override): `steps` tried (one per W, two per top), `failed` (systems heavier than the resonance, left unchanged), `failed_w_in_top` (the failed first steps of tops: the top is still restored, its W is not) and `max_residual`, the largest $\max_\mu \lvert\sum p^\mu - P^\mu\rvert / E$ of the restored resonances; zeros when it is off. A merged file of different runs has no provenance, so `check_identities` then skips `hadron_sum` |
 | `stage_times_s` | seconds per stage, summed over chunks and workers: `hard`, `shower`, `hadronize`, `ue`, `detector`, `jet_building`, `observables`, `write` |
 | `package_version`, `git_commit` | version of `itj`; the commit when run from a git checkout (`-dirty` with local changes) |
 | `python_version`, `numpy_version`, `pyarrow_version`, `platform` | software environment |

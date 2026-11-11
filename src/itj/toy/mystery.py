@@ -3,18 +3,21 @@
 A planted shortcut is one configuration field changed for one process only: the jets of that process then carry a
 feature that a tagger can learn although it has nothing to do with the physics of the class. ``--mystery`` picks
 one of :data:`SHORTCUTS` from the seed, generates the file with it as a per-process override and stores the choice
-only in ``provenance["mystery"]`` (base64 of JSON): it is not in the stored configuration, not in
-``provenance["process_overrides"]``, not in ``jetgen info`` and never printed. :func:`reveal` decodes it
+only in ``provenance["mystery"]``, scrambled (JSON XORed with a SHA-256 stream of the key, then base64): it is not
+in the stored configuration, not in ``provenance["process_overrides"]``, not in ``jetgen info`` (``--provenance``
+prints a placeholder) and cannot be read with a base64 decoder. :func:`reveal` unscrambles it
 (``jetgen info --reveal``).
 
-Reading this module spoils T7.2: the mapping from the seed to the shortcut below is public. An instructor who
-wants a real hunt sets the environment variable ``ITJ_MYSTERY_KEY`` to a private integer before generating the
-students' files (``docs/physics.md#planted-shortcuts``).
+The scrambling is not encryption. Reading this module spoils T7.2: the mapping from the seed to the shortcut and
+the default key are public. An instructor who wants a real hunt sets the environment variable ``ITJ_MYSTERY_KEY``
+to a private integer before generating the students' files; both the mapping and the scrambling then depend on it,
+and ``--reveal`` needs the same key (``docs/physics.md#planted-shortcuts``).
 """
 
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 from collections.abc import Mapping
@@ -25,7 +28,7 @@ import numpy as np
 
 from ..data import JetData
 
-__all__ = ["SHORTCUTS", "decode", "encode", "mystery_overrides", "reveal"]
+__all__ = ["HIDDEN", "SHORTCUTS", "decode", "encode", "hide", "mystery_overrides", "reveal"]
 
 #: The planted shortcuts: (name, process, configuration field, value). The strengths are calibrated so that a PFN
 #: (``kin`` features, 10 epochs on 42 000 jets) gains 1.5-3 % of test accuracy from the shortcut (QCD/W/top accuracy
@@ -41,6 +44,12 @@ SHORTCUTS: tuple[tuple[str, str, str, object], ...] = (
 
 #: Environment variable with the instructor's key (an integer; default 0, the public mapping).
 KEY_VARIABLE = "ITJ_MYSTERY_KEY"
+
+#: What ``jetgen info --provenance`` prints in place of the scrambled entry.
+HIDDEN = "<hidden: jetgen info --reveal>"
+
+#: Prefix of a scrambled entry (files of itj 0.1.0 hold plain base64 of JSON, which :func:`decode` still reads).
+_SCRAMBLED = "x1:"
 
 
 def _key() -> int:
@@ -80,22 +89,57 @@ def mystery_overrides(seed: int) -> dict[str, dict[str, object]]:
     return {process: {name: value}}
 
 
+def _scramble(raw: bytes, key: int) -> bytes:
+    """XOR ``raw`` with a SHA-256 counter stream of ``key`` (its own inverse)."""
+    stream = b"".join(
+        hashlib.sha256(f"itj-mystery:{key}:{block}".encode()).digest() for block in range(len(raw) // 32 + 1)
+    )
+    return bytes(a ^ b for a, b in zip(raw, stream[: len(raw)], strict=True))
+
+
 def encode(seed: int) -> str:
-    """Return the ``provenance["mystery"]`` entry of a mystery file of this seed (base64 of JSON)."""
+    """Return the ``provenance["mystery"]`` entry of a mystery file of this seed (scrambled JSON, see the module)."""
     name, process, field, value = SHORTCUTS[_index(int(seed))]
     payload = {"name": name, "process": process, "field": field, "value": value, "key_set": _key() != 0}
-    return base64.b64encode(json.dumps(payload, sort_keys=True).encode()).decode("ascii")
+    raw = _scramble(json.dumps(payload, sort_keys=True).encode(), _key())
+    return _SCRAMBLED + base64.b64encode(raw).decode("ascii")
 
 
 def decode(text: str) -> dict[str, Any]:
-    """Decode a ``provenance["mystery"]`` entry (inverse of :func:`encode`)."""
+    """Decode a ``provenance["mystery"]`` entry (inverse of :func:`encode`, with the key of ``ITJ_MYSTERY_KEY``)."""
+    scrambled = text.startswith(_SCRAMBLED)
+    body = text[len(_SCRAMBLED) :] if scrambled else text
     try:
-        payload = json.loads(base64.b64decode(text.encode("ascii"), validate=True).decode())
+        raw = base64.b64decode(body.encode("ascii"), validate=True)
     except (ValueError, UnicodeError) as error:
         raise ValueError(f"cannot decode the mystery entry {text[:20]!r}...: {error}") from None
+    try:
+        payload = json.loads((_scramble(raw, _key()) if scrambled else raw).decode())
+    except (ValueError, UnicodeError):
+        if scrambled:
+            raise ValueError(
+                f"cannot decode the mystery entry: the file was made with another {KEY_VARIABLE}; set the key it "
+                "was made with (ask your instructor)"
+            ) from None
+        raise ValueError(f"cannot decode the mystery entry {text[:20]!r}...: not JSON") from None
     if not isinstance(payload, dict) or not {"name", "process", "field", "value"} <= set(payload):
         raise ValueError("the mystery entry is not a planted shortcut")
     return payload
+
+
+def hide(provenance: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a copy of a provenance with every mystery entry (also of merged inputs) replaced by :data:`HIDDEN`."""
+    out = dict(provenance)
+    if "mystery" in out:
+        out["mystery"] = HIDDEN
+    if isinstance(out.get("merged"), list):
+        out["merged"] = [
+            {**item, "provenance": hide(item["provenance"])}
+            if isinstance(item, Mapping) and isinstance(item.get("provenance"), Mapping)
+            else item
+            for item in out["merged"]
+        ]
+    return out
 
 
 def _entries(provenance: Mapping[str, Any] | None) -> list[str]:

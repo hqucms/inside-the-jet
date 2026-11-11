@@ -12,17 +12,24 @@ The b quarks of the hard process (top decays, b-initiated QCD jets) start their 
 ``z^alpha (1 - z)`` with mean ``b_frag_mean``) that flies an exponential proper length ``c tau`` and decays into
 ``b_decay_multiplicity`` massless products (RAMBO): charged hadrons, photons, semileptonic and cascade leptons, each
 lepton with an invisible neutrino (dropped). pi0 -> gamma gamma is isotropic in the pi0 rest frame.
+
+The chains conserve the energy of their partons but not the momentum (the hadrons are massive), so the invariant
+mass of every resonance system grows. Two optional switches act on W and top jets (off by default; see
+``docs/physics.md#hadron-level-reshuffle``): ``singlet_frame`` runs the chains of the W quarks in the W rest frame
+(:func:`singlet_boosts`), and ``hadron_reshuffle`` moves the chain hadrons of every W and top, before the B and pi0
+decays, so that they sum to the parton-level four-momentum of the resonance (:func:`reshuffle_hadrons`).
 """
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .kinematics import boost, direction, perp_basis, rambo
+from .kinematics import boost, direction, mass, perp_basis, rambo
+from .shower import reshuffle
 
 if TYPE_CHECKING:
     from .config import HadronPart
@@ -37,6 +44,8 @@ __all__ = [
     "draw_species",
     "ff_z",
     "hadronize",
+    "reshuffle_hadrons",
+    "singlet_boosts",
     "species_probabilities",
 ]
 
@@ -58,6 +67,14 @@ _MASS_MARGIN = 0.05
 
 #: Transverse momenta are capped at this fraction of |p|.
 _KT_CAP = 0.9
+
+#: The steps of the hadron-level reshuffle: (number of prongs of the event, system index of every prong taking part).
+#: W: the hadrons of each quark; top: first the W inside the top (its two quarks), then the top (the b and the W).
+_RESHUFFLE_STEPS: tuple[tuple[int, dict[int, int]], ...] = (
+    (2, {0: 0, 1: 1}),
+    (3, {1: 0, 2: 1}),
+    (3, {0: 0, 1: 1, 2: 1}),
+)
 
 
 @dataclass
@@ -213,7 +230,7 @@ class _Chains:
 
 
 def _fragment(
-    partons: PartonArrays, cfg: HadronPart, rng: np.random.Generator, stats: dict[str, int]
+    partons: PartonArrays, cfg: HadronPart, rng: np.random.Generator, stats: dict[str, float]
 ) -> tuple[np.ndarray, ...]:
     """Run all chains together, one rank per iteration; returns per-hadron arrays sorted by (chain, rank)."""
     m = len(partons)
@@ -279,6 +296,111 @@ def _fragment(
     return p4[order], species_all[order], charge_all[order], chain_all[order], rank_all[order]
 
 
+def _sum_by(index: np.ndarray, p4: np.ndarray, n: int) -> np.ndarray:
+    """Sum the four-vectors ``p4`` by ``index`` into ``(n, 4)``."""
+    return np.stack([np.bincount(index, weights=p4[:, c], minlength=n) for c in range(4)], axis=1)
+
+
+def _resonance_prongs(partons: PartonArrays) -> np.ndarray:
+    """Return the number of prongs of every event of the group (1 QCD, 2 W, 3 top) from its partons."""
+    n_events = int(partons.event.max()) + 1 if len(partons) else 0
+    nprongs = np.zeros(n_events, dtype=np.int64)
+    np.maximum.at(nprongs, partons.event, partons.prong.astype(np.int64) + 1)
+    return nprongs
+
+
+def singlet_boosts(partons: PartonArrays) -> np.ndarray:
+    """Velocity ``(m, 3)`` of the W rest frame for the quarks of every W (also inside a top), zero for the others.
+
+    Independent fragmentation of a boosted W in the generation frame makes the two quarks fragment as if each had a
+    colour partner of its own energy far away; in the rest frame of the W, the frame of their colour singlet, they
+    fragment as in e+e- -> q qbar at the W mass. QCD jets and the b of a top (colour-connected to the outside) keep
+    the generation frame.
+    """
+    nprongs = _resonance_prongs(partons)
+    prongs = nprongs[partons.event]
+    in_w = ((prongs == 2) & (partons.prong <= 1)) | ((prongs == 3) & (partons.prong >= 1))
+    w = _sum_by(partons.event[in_w], partons.p4[in_w], len(nprongs))
+    beta = np.zeros((len(nprongs), 3))
+    has_w = w[:, 3] > 0
+    beta[has_w] = w[has_w, :3] / w[has_w, 3:4]
+    return np.where(in_w[:, None], beta[partons.event], 0.0)
+
+
+def reshuffle_hadrons(
+    partons: PartonArrays, p4: np.ndarray, parent: np.ndarray, stats: dict[str, float] | None = None
+) -> tuple[np.ndarray, np.ndarray]:
+    """Move the hadrons of every W and top so that they sum to the parton-level four-momentum of the resonance.
+
+    The chains conserve the energy of their partons but not their momentum (the hadrons are massive), so every
+    resonance system gains invariant mass. Each step treats the hadrons of the partons of one prong (or of the two
+    quarks of a W inside a top) as one system ``i`` of mass ``m_i`` and solves :func:`itj.toy.shower.reshuffle` in
+    the rest frame of the parton-level momentum P of the resonance, with the parton-level system momenta ``q_i``
+    there: ``sum_i sqrt(k^2 |q_i|^2 + m_i^2) = M``, each system boosted rigidly to ``k q_i``, then back
+    (``docs/physics.md#hadron-level-reshuffle``). The steps are the W, then for a top the W inside it and the top
+    itself (the b system and the W system), so that, when both steps succeed, the top and its W keep their
+    parton-level masses (the parton-level W of a top is that of the shower reshuffle, about 2 GeV above m_W). QCD
+    jets are left alone. A step with ``sum_i m_i >= M`` leaves its hadrons unchanged.
+
+    Parameters
+    ----------
+    partons : PartonArrays
+        Final partons of the group (generation frame), sorted by event.
+    p4 : numpy.ndarray
+        ``(h, 4)`` chain hadrons (before the B and pi0 decays).
+    parent : numpy.ndarray
+        ``(h,)`` row of the parton of every hadron in ``partons``.
+    stats : dict, optional
+        Counters updated in place: ``hadron_reshuffles`` (steps tried), ``hadron_reshuffle_failed`` (all failed
+        steps) and ``hadron_reshuffle_failed_w_in_top`` (the failed first steps of tops: the top four-momentum can
+        still be restored, but its W keeps the mass of its hadrons).
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        The moved hadrons ``(h, 4)`` and ``restored`` ``(n_events,)``, True for the W and top events whose hadrons
+        now sum to the parton-level resonance (the last step succeeded).
+    """
+    stats = {} if stats is None else stats
+    nprongs = _resonance_prongs(partons)
+    restored = np.zeros(len(nprongs), dtype=bool)
+    out = p4.copy()
+    h_event, h_prong = partons.event[parent], partons.prong[parent]
+    tried = failed = failed_w_in_top = 0
+    for n_prongs, systems in _RESHUFFLE_STEPS:
+        events = np.flatnonzero(nprongs == n_prongs)
+        if len(events) == 0:
+            continue
+        n = len(events)
+        slot = np.full(len(nprongs), -1, dtype=np.int64)  # position of the event among those of this step
+        slot[events] = np.arange(n)
+        lookup = np.full(3, -1, dtype=np.int64)  # system of every prong (-1: not in this step)
+        for prong, system in systems.items():
+            lookup[prong] = system
+        p_rows = np.flatnonzero((slot[partons.event] >= 0) & (lookup[partons.prong] >= 0))
+        h_rows = np.flatnonzero((slot[h_event] >= 0) & (lookup[h_prong] >= 0))
+        p_system = 2 * slot[partons.event[p_rows]] + lookup[partons.prong[p_rows]]
+        h_slot = slot[h_event[h_rows]]
+        # parton-level systems and resonance, and the system momenta q_i in the resonance rest frame
+        q = _sum_by(p_system, partons.p4[p_rows], 2 * n).reshape(n, 2, 4)
+        big_p = q.sum(axis=1)
+        beta = big_p[:, :3] / big_p[:, 3:4]
+        q_rest = boost(q, -beta[:, None, :])[..., :3]
+        rest = boost(out[h_rows], -beta[h_slot])
+        moved, ok = reshuffle(q_rest, rest, 2 * h_slot + lookup[h_prong[h_rows]], mass(big_p))
+        out[h_rows] = boost(moved, beta[h_slot])
+        tried += n
+        failed += int((~ok).sum())
+        if 0 in systems:  # the last step of its events
+            restored[events] = ok
+        else:  # the W inside a top
+            failed_w_in_top += int((~ok).sum())
+    stats["hadron_reshuffles"] = stats.get("hadron_reshuffles", 0) + tried
+    stats["hadron_reshuffle_failed"] = stats.get("hadron_reshuffle_failed", 0) + failed
+    stats["hadron_reshuffle_failed_w_in_top"] = stats.get("hadron_reshuffle_failed_w_in_top", 0) + failed_w_in_top
+    return out, restored
+
+
 def _b_decays(
     p4: np.ndarray, cfg: HadronPart, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -310,7 +432,7 @@ def _b_decays(
 
 
 def hadronize(
-    partons: PartonArrays, cfg: HadronPart, rng: np.random.Generator, stats: dict[str, int] | None = None
+    partons: PartonArrays, cfg: HadronPart, rng: np.random.Generator, stats: dict[str, float] | None = None
 ) -> HadronArrays:
     """Turn the final partons of a group into hadrons (generation frame; neutrinos dropped).
 
@@ -323,8 +445,10 @@ def hadronize(
     rng : numpy.random.Generator
         The hadron stream.
     stats : dict, optional
-        Counters updated in place: ``hadrons`` (chain hadrons) and ``hadrons_capped`` (their transverse momentum
-        was capped).
+        Counters updated in place: ``hadrons`` (chain hadrons), ``hadrons_capped`` (their transverse momentum
+        was capped) and, with ``hadron_reshuffle``, those of :func:`reshuffle_hadrons` and
+        ``hadron_reshuffle_residual``, the largest ``max_mu |sum p^mu - P^mu| / E`` over the restored W and top
+        events (all decay products, neutrinos included, against the parton-level resonance P).
 
     Returns
     -------
@@ -333,8 +457,17 @@ def hadronize(
         their parent); ``index`` counts them per event.
     """
     stats = {} if stats is None else stats
-    p4, species, charge, chain, rank = _fragment(partons, cfg, rng, stats)
+    if cfg.singlet_frame:
+        beta = singlet_boosts(partons)
+        rest = replace(partons, p4=boost(partons.p4, -beta))
+        p4, species, charge, chain, rank = _fragment(rest, cfg, rng, stats)
+        p4 = boost(p4, beta[chain])
+    else:
+        p4, species, charge, chain, rank = _fragment(partons, cfg, rng, stats)
     stats["hadrons"] = stats.get("hadrons", 0) + len(p4)
+    restored = np.zeros(0, dtype=bool)
+    if cfg.hadron_reshuffle:
+        p4, restored = reshuffle_hadrons(partons, p4, chain, stats)
     h = len(p4)
     vertex = np.zeros((h, 4))
     from_b = np.zeros(h, dtype=bool)
@@ -368,7 +501,14 @@ def hadronize(
         cat["species"] = np.concatenate([cat["species"], np.full(2 * len(rows), PHOTON, np.int8)])
         cat["charge"] = np.concatenate([cat["charge"], np.zeros(2 * len(rows), np.int8)])
         cat["sub"] = np.concatenate([cat["sub"], 2 * cat["sub"][rows] + 100, 2 * cat["sub"][rows] + 101])
-    stable = (cat["species"] != PI0) & (cat["species"] != B_HADRON) & (cat["species"] != NEUTRINO)
+    final = (cat["species"] != PI0) & (cat["species"] != B_HADRON)
+    if restored.any():  # the identity of the reshuffle, with every decay product (neutrinos included)
+        n_events = len(restored)
+        resonance = _sum_by(partons.event, partons.p4, n_events)
+        residual = _sum_by(partons.event[cat["chain"][final]], all_p4[final], n_events) - resonance
+        worst = float(np.max(np.abs(residual[restored]).max(axis=1) / resonance[restored, 3]))
+        stats["hadron_reshuffle_residual"] = max(stats.get("hadron_reshuffle_residual", 0.0), worst)
+    stable = final & (cat["species"] != NEUTRINO)
     order = np.flatnonzero(stable)
     order = order[np.lexsort((cat["sub"][order], cat["rank"][order], cat["chain"][order]))]
     parton_index = partons.index_in_event()

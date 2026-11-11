@@ -91,8 +91,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _metrics(probs: np.ndarray, y: np.ndarray, label_set: str) -> dict[str, float]:
-    """Return the accuracy and the one-vs-one AUC and rejections (W and top against QCD) of the test scores."""
-    from itj.metrics import accuracy, auc, one_vs_one, rejection
+    """Return the accuracy and the one-vs-one AUC and rejections (W and top against QCD) of the test scores.
+
+    Every AUC and rejection comes with its bootstrap error (100 resamplings) as ``<name>_err``.
+    """
+    from itj.metrics import accuracy, auc, bootstrap, one_vs_one, rejection
 
     out = {"accuracy": accuracy(probs, y)}
     classes = LABEL_SETS[label_set][1]
@@ -102,13 +105,21 @@ def _metrics(probs: np.ndarray, y: np.ndarray, label_set: str) -> dict[str, floa
     w, top, qcd = classes
     yw, sw, _ = one_vs_one(probs, y, w, qcd)
     yt, st, _ = one_vs_one(probs, y, top, qcd)
-    out.update(
-        auc_w=auc(yw, sw),
-        r50_w=rejection(yw, sw, 0.5),
-        auc_top=auc(yt, st),
-        r50_top=rejection(yt, st, 0.5),
-        r80_top=rejection(yt, st, 0.8),
-    )
+
+    def r50(yy: np.ndarray, ss: np.ndarray) -> float:
+        return rejection(yy, ss, 0.5)
+
+    def r80(yy: np.ndarray, ss: np.ndarray) -> float:
+        return rejection(yy, ss, 0.8)
+
+    for name, metric, (yy, ss) in (
+        ("auc_w", auc, (yw, sw)),
+        ("r50_w", r50, (yw, sw)),
+        ("auc_top", auc, (yt, st)),
+        ("r50_top", r50, (yt, st)),
+        ("r80_top", r80, (yt, st)),
+    ):
+        out[name], out[name + "_err"] = bootstrap(metric, yy, ss)
     return out
 
 
@@ -244,8 +255,9 @@ def train_one(
         "note": (note + (f" auc_qg={metrics['auc']:.4f}" if "auc" in metrics else "")).strip(),
     }
     for key in ("auc_w", "r50_w", "auc_top", "r50_top", "r80_top"):
-        if key in metrics:
-            row[key] = round(metrics[key], 5)
+        for name in (key, key + "_err"):
+            if name in metrics:
+                row[name] = round(metrics[name], 5)
     append_result(results, row)
 
     summary = ", ".join(f"{k} {v:.4g}" for k, v in metrics.items())

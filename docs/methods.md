@@ -34,7 +34,8 @@ separate error (train several seeds where the tasks ask for it).
 
 **The results table.** `append_result("results_table.csv", row)` appends one row with the columns
 `itj.metrics.RESULT_COLUMNS` (model, training and test data, sizes, AUC and $R_{50}$ for W and top against QCD, $R_{80}$
-for top, accuracy, parameters, training time, seed, note). Keep one table from T2 to T6.
+for top, their bootstrap errors in the `*_err` columns, accuracy, parameters, training time, seed, note). Keep one table
+from T2 to T6.
 
 **Train, choose, report.** Train on the train part, choose cuts, epochs and hyperparameters on the val part, and
 report on the test part once.
@@ -152,7 +153,10 @@ what it does:
   (`ablate_pair_channels(model, [k], fill="mean")`) and measure the change of the AUC. Soft, but the model never saw
   such inputs.
 - **Zeroing** $U$ (`zero_pair_bias(model)`) breaks a trained ParT completely (the class-attention inputs move far from
-  their training distribution); it measures how much the trained model depends on $U$, not how useful $U$ is.
+  their training distribution); it measures how much the trained model depends on $U$, not how useful $U$ is. For
+  `ParT_kin` on JetClass it drops the accuracy on top jets (argmax over the ten outputs) from about 0.91 to 0.11, most
+  jets becoming `Tbl` (after `probs_to_jets3`: from 0.95 to 0.62), while retraining without the pair bias costs only
+  about 0.015 in the W against QCD AUC.
 
 The honest ablation is retraining: the same model without $U$ (`partsmall_nopair`), or with fewer pair features
 (`pair_input_dim=1`), trained in the same way, compared with errors.
@@ -175,7 +179,9 @@ $1/\mathrm{JSD}$ at a given rejection.
 - **Planing** (1709.10106): weight the training jets so that the mass distribution is flat in every class:
   $w = 1/\hat p_c(m)$ from a histogram per class $c$ (for example 20 bins on [40, 250] GeV), normalised so that the
   weights of a class sum to its number of jets, capped (at 10) against empty bins; pass them as
-  `JetDataset(weights=...)`. The network can no longer gain from the mass shape.
+  `JetDataset(weights=...)`. The network can no longer gain from the mass shape. Say what the jets outside the
+  histogram get: in T3.5 they keep the weight 1 before the normalisation (two thirds of the QCD jets have
+  $m_\mathrm{SD} < 40$ GeV, so dropping them instead, with weight 0, trains a different tagger).
 - **DisCo** (2001.05310): add the distance correlation between the score and the mass of background jets to the loss.
 - Others: designed decorrelation (DDT, 1603.00027), adversaries (1611.01046), MoDe (2010.09745).
 

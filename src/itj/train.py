@@ -275,9 +275,11 @@ def fit(
     warmup_steps : int
         Optimiser steps of linear warm-up.
     min_steps : int
-        Train for at least this many optimiser steps: ``epochs`` is raised to ``ceil(min_steps * batch_size /
-        n_train)`` (``ceil(min_steps / batches per epoch)`` for an iterable) when that is larger, so that learning
-        curves compare models at a fixed number of steps.
+        Plan at least this many optimiser steps: ``epochs`` (and with it the length of the cosine schedule) is
+        raised to ``ceil(min_steps * batch_size / n_train)`` (``ceil(min_steps / batches per epoch)`` for an
+        iterable) when that is larger, so that a small training set gets enough epochs. ``patience`` and
+        ``max_minutes`` can still stop the run earlier: with ``patience`` a small set stops at its best validation
+        loss, often after a few hundred steps.
     loss : callable, optional
         ``loss(model, batch) -> scalar tensor`` replacing the default cross entropy (weighted by ``batch.weight``
         when the batch has weights: ``sum_i w_i CE_i / sum_i w_i``); the accuracies are then NaN in training.
@@ -466,6 +468,11 @@ def predict(
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     fs = feature_set if feature_set is not None else getattr(model, "feature_set", None)
     jet_features = getattr(model, "jet_features", None)
+    if fs is None and jet_features is None and not isinstance(data, JetDataset):
+        raise ValueError(
+            "the model has neither a feature_set nor jet_features attribute (a model of your own): pass "
+            "feature_set=... (for example 'kin'), or predict on a JetDataset"
+        )
     was_training = model.training
     model.to(device).eval()
     outputs: list[np.ndarray] = []

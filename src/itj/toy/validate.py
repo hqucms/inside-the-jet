@@ -193,6 +193,11 @@ def check_identities(data: JetData) -> dict[str, bool]:
       parton energies sum to the seed energy in the generation frame (the seed at y = 0) and
       ``|sum p_perp| / E < 0.05`` in that frame (the tolerance of the spec; the generator rotates every QCD jet
       onto the seed axis, so it is 0 up to rounding);
+    * ``hadron_sum``: (whenever the hadron reshuffle ran, also through a per-process override) the hadrons of every
+      restored W and top, with all decay products and the neutrinos, sum to the parton-level resonance, relative
+      1e-8 in the generation frame. The file holds neither the hadrons outside the jet nor the neutrinos, so this
+      reads the generator's own measurement, ``provenance["hadron_reshuffle"]["max_residual"]`` (a merged file of
+      different runs has no provenance and skips it);
     * ``containment``: (``partons`` preset) the jet holds every decay parton;
     * ``emission_order``: emission angles decrease along every branch;
     * ``coherence_start``: (with coherence) the first emission of every W quark is below the W opening angle.
@@ -220,6 +225,7 @@ def check_identities(data: JetData) -> dict[str, bool]:
         ("prong_range", _check_prong_range),
         ("prong_sum", _check_prong_sum),
         ("parton_sum", _check_parton_sum),
+        ("hadron_sum", _check_hadron_sum),
         ("containment", _check_containment),
         ("emission_order", _check_emission_order),
         ("coherence_start", _check_coherence),
@@ -382,6 +388,18 @@ def _check_containment(data: JetData) -> bool:
 
 
 _PARTON_LEVEL = (("shower", "shower"), ("hadron", "hadronize"), ("ue", "ue"))
+
+#: Tolerance of the hadron-level reshuffle identity (relative, float64, generation frame).
+_HADRON_SUM_TOL = 1e-8
+
+
+def _check_hadron_sum(data: JetData) -> bool:
+    # the provenance counts the steps of every process, so a per-process override (--override
+    # wqq:hadron_reshuffle=true) is covered although the global switch is off
+    record = (data.provenance or {}).get("hadron_reshuffle")
+    if not isinstance(record, dict) or not record.get("steps"):
+        raise _NotApplicable
+    return float(record["max_residual"]) <= _HADRON_SUM_TOL
 
 
 def _check_emission_order(data: JetData) -> bool:

@@ -34,15 +34,17 @@ exactly those of `itj.io.load(path, part="test")`.
 ## A short CPU run on the toy
 
 A ParT of the size of `itj`'s `partsmall` (3 particle-attention blocks, 1 class-attention block, embedding
-(64, 256, 64), pair embedding (32, 32, 32), 4 heads) trained for 30 steps of 256 jets, then tested on the 30 000 test
-jets. About 35 s on a 2016 six-core CPU.
+(64, 256, 64), pair embedding (32, 32, 32), 4 heads) trained for 30 steps of 256 jets at a constant learning rate
+(`--lr-scheduler none`: with `--num-epochs 1` weaver's default `flat+decay` would run the whole epoch at 1 % of
+`--start-lr` and learn nothing), then tested on the 30 000 test jets. About 1 minute on an otherwise idle 2016 six-core
+CPU: 30 s for the 30 steps, 25 s for the test; it needs about 6 GB of memory (`--in-memory`).
 
 ```bash
-weaver --data-train 't2:data/t2_split/train/t2_detector.parquet' --data-val data/t2_split/val/t2_detector.parquet --data-test 't2:data/t2_split/test/t2_detector.parquet' --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3 -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4 --model-prefix runs/weaver_partsmall/net --gpus '' --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1 --steps-per-epoch 30 --in-memory --fetch-step 1 --predict-output pred.parquet
+weaver --data-train 't2:data/t2_split/train/t2_detector.parquet' --data-val data/t2_split/val/t2_detector.parquet --data-test 't2:data/t2_split/test/t2_detector.parquet' --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3 -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4 --model-prefix runs/weaver_partsmall/net --gpus '' --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1 --steps-per-epoch 30 --lr-scheduler none --in-memory --fetch-step 1 --predict-output pred.parquet
 ```
 
 ```bat
-weaver --data-train t2:data/t2_split/train/t2_detector.parquet --data-val data/t2_split/val/t2_detector.parquet --data-test t2:data/t2_split/test/t2_detector.parquet --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3 -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4 --model-prefix runs/weaver_partsmall/net --gpus "" --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1 --steps-per-epoch 30 --in-memory --fetch-step 1 --predict-output pred.parquet
+weaver --data-train t2:data/t2_split/train/t2_detector.parquet --data-val data/t2_split/val/t2_detector.parquet --data-test t2:data/t2_split/test/t2_detector.parquet --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3 -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4 --model-prefix runs/weaver_partsmall/net --gpus "" --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1 --steps-per-epoch 30 --lr-scheduler none --in-memory --fetch-step 1 --predict-output pred.parquet
 ```
 
 What it writes:
@@ -53,8 +55,8 @@ What it writes:
 | `runs/weaver_partsmall/predict_output/pred_t2.parquet` | `scores` (softmax, $N \times 3$), `_label_` and the observers `jet_pt` ... `jet_tau4`, one row per test jet in file order |
 | `src/itj/configs/jets3_kin.<hash>.auto.yaml` | the data configuration as weaver completed it (ignored by git) |
 
-After 30 steps the tagger is far from trained: the run checks the chain, not the physics. Load the checkpoint into
-`itj` and compare the scores:
+After 30 steps the tagger is far from trained (test accuracy about 0.6-0.7; chance is 1/3): the run checks the chain,
+not the physics. Load the checkpoint into `itj` and compare the scores:
 
 ```python
 import numpy as np
@@ -75,15 +77,15 @@ print("max |delta s| =", np.abs(s_itj - s_weaver).max())
 
 ## The same on JetClass
 
-The identical command on the split JetClass files, with one named group per class (about 80 s: the JetClass files are
-larger):
+The identical command on the split JetClass files, with one named group per class (about 1.5 minutes: 60 000 test
+jets):
 
 ```bash
-weaver --data-train 'QCD:data/jetclass/split/train/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/train/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/train/TTBar_120.parquet' --data-val 'QCD:data/jetclass/split/val/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/val/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/val/TTBar_120.parquet' --data-test 'QCD:data/jetclass/split/test/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/test/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/test/TTBar_120.parquet' --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3 -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4 --model-prefix runs/weaver_partsmall_jc/net --gpus '' --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1 --steps-per-epoch 30 --in-memory --fetch-step 1 --predict-output pred.parquet
+weaver --data-train 'QCD:data/jetclass/split/train/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/train/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/train/TTBar_120.parquet' --data-val 'QCD:data/jetclass/split/val/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/val/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/val/TTBar_120.parquet' --data-test 'QCD:data/jetclass/split/test/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/test/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/test/TTBar_120.parquet' --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3 -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4 --model-prefix runs/weaver_partsmall_jc/net --gpus '' --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1 --steps-per-epoch 30 --lr-scheduler none --in-memory --fetch-step 1 --predict-output pred.parquet
 ```
 
 ```bat
-weaver --data-train QCD:data/jetclass/split/train/ZJetsToNuNu_120.parquet Wqq:data/jetclass/split/train/WToQQ_120.parquet Tbqq:data/jetclass/split/train/TTBar_120.parquet --data-val QCD:data/jetclass/split/val/ZJetsToNuNu_120.parquet Wqq:data/jetclass/split/val/WToQQ_120.parquet Tbqq:data/jetclass/split/val/TTBar_120.parquet --data-test QCD:data/jetclass/split/test/ZJetsToNuNu_120.parquet Wqq:data/jetclass/split/test/WToQQ_120.parquet Tbqq:data/jetclass/split/test/TTBar_120.parquet --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3 -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4 --model-prefix runs/weaver_partsmall_jc/net --gpus "" --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1 --steps-per-epoch 30 --in-memory --fetch-step 1 --predict-output pred.parquet
+weaver --data-train QCD:data/jetclass/split/train/ZJetsToNuNu_120.parquet Wqq:data/jetclass/split/train/WToQQ_120.parquet Tbqq:data/jetclass/split/train/TTBar_120.parquet --data-val QCD:data/jetclass/split/val/ZJetsToNuNu_120.parquet Wqq:data/jetclass/split/val/WToQQ_120.parquet Tbqq:data/jetclass/split/val/TTBar_120.parquet --data-test QCD:data/jetclass/split/test/ZJetsToNuNu_120.parquet Wqq:data/jetclass/split/test/WToQQ_120.parquet Tbqq:data/jetclass/split/test/TTBar_120.parquet --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3 -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4 --model-prefix runs/weaver_partsmall_jc/net --gpus "" --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1 --steps-per-epoch 30 --lr-scheduler none --in-memory --fetch-step 1 --predict-output pred.parquet
 ```
 
 The predictions go to `runs/weaver_partsmall_jc/predict_output/pred_QCD.parquet`, `pred_Wqq.parquet` and
@@ -159,8 +161,8 @@ then `%cd inside-the-jet` and run the commands above with `--gpus 0`.
 
 | run | where | time | output |
 |---|---|---|---|
-| toy, 30 steps | CPU, 6 threads | about 35 s | `runs/weaver_partsmall/`, `pred_t2.parquet` (30 000 jets) |
-| JetClass, 30 steps | CPU | about 80 s | `runs/weaver_partsmall_jc/`, three prediction files (20 000 jets each) |
+| toy, 30 steps | CPU, 6 threads | about 1 minute | `runs/weaver_partsmall/`, `pred_t2.parquet` (30 000 jets) |
+| JetClass, 30 steps | CPU | about 1.5 minutes | `runs/weaver_partsmall_jc/`, three prediction files (20 000 jets each) |
 | pretrained `ParT_kin`, 3 x 1 000 jets | CPU | about 20 s | `models/pretrained/predict_output/pred_ParT_kin_*.parquet` |
 | full ParT, 300 000 jets x 20 epochs | GPU | about 2-2.5 h on a GTX 1080 Ti | `runs/weaver_part/` |
 
@@ -177,3 +179,7 @@ then `%cd inside-the-jet` and run the commands above with `--gpus 0`.
   file, which the default `--fetch-step 0.01` does; every command here therefore has `--fetch-step 1` (each file is
   read in one piece).
 - **Lists in `-o`:** the values are read as Python literals, so quote lists: `-o embed_dims "[64,256,64]"`.
+- **A short run stays at chance** (accuracy about 1/3, `lr=1.00e-05` in the progress bar): the command lacks
+  `--lr-scheduler none` (see above).
+- **"ERROR: Error in flops: No module named 'tabulate'":** harmless, it comes from weaver's count of the
+  floating-point operations; the `weaver` extra installs `tabulate`, a separate weaver install may not.

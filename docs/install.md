@@ -149,8 +149,10 @@ files when it ends: copy your results to your own storage.
   disk and link it: `python3 -m venv /path/with/space/inside-the-jet && ln -s /path/with/space/inside-the-jet .venv`.
 - `pytest` not found: it comes with the `dev` extra, `pip install -e ".[analysis,dev]"`.
 - `jetgen fetch` is slow or blocked: the downloads resume where they stopped when you run the command again; a teacher
-  can provide the files on a local share, read with `jetgen fetch jetclass --base-url URL`
-  ([jetclass.md](jetclass.md#download)).
+  can provide the files on a local share, read with `jetgen fetch jetclass --base-url URL`, where `URL` holds the
+  folders `val/`, `train/` and `example/` as on the mirror ([jetclass.md](jetclass.md#download)).
+- A training is killed or the machine swaps in T2.4: the two ParT-small trainings need about 13 GB together; run them
+  one after the other on a laptop with 8 GB.
 - `uproot` or `awkward` not found when reading the ROOT example of JetClass: install the `analysis` extra.
 - weaver fails with "CUDA" errors on a laptop: pass `--gpus ''`.
 - In every new terminal, activate the environment again: `cd inside-the-jet && source .venv/bin/activate`.

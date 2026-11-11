@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from helpers import KS_LIMIT, N_SIGMA, assert_binomial, ks_distance
-from itj.toy.config import HadronPart
+from itj.toy.config import HadronPart, preset
 from itj.toy.hadronize import (
     B_HADRON,
     B_MASS,
@@ -24,10 +24,13 @@ from itj.toy.hadronize import (
     draw_species,
     ff_z,
     hadronize,
+    reshuffle_hadrons,
+    singlet_boosts,
     species_probabilities,
 )
-from itj.toy.kinematics import mass
-from itj.toy.shower import PartonArrays
+from itj.toy.hardprocess import sample_hard
+from itj.toy.kinematics import boost, mass
+from itj.toy.shower import PartonArrays, shower_events
 
 
 def _partons(energies, *, hard_b=False, events=None):
@@ -196,3 +199,130 @@ def test_light_partons_make_no_b_hadrons_and_from_partons():
     np.testing.assert_array_equal(as_particles.index, [0, 1, 0])
     np.testing.assert_array_equal(as_particles.parton, [0, 1, 0])
     assert not as_particles.is_ue.any()
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# W and top: the singlet frame and the hadron-level reshuffle
+
+
+def _resonance_partons(code, n=300, seed=11):
+    cfg = preset("hadrons")
+    rng = np.random.default_rng(seed)
+    hard = sample_hard(n, code, cfg, rng)
+    partons, _ = shower_events(hard, cfg, rng)
+    return partons
+
+
+def _sum(index, p4, n):
+    total = np.zeros((n, 4))
+    np.add.at(total, index, p4)
+    return total
+
+
+@pytest.mark.parametrize("singlet", [False, True])
+@pytest.mark.parametrize("code", [1, 2])
+def test_hadron_reshuffle_restores_the_resonance(code, singlet):
+    partons = _resonance_partons(code)
+    n = int(partons.event.max()) + 1
+    resonance = _sum(partons.event, partons.p4, n)
+    # without neutrinos every stable particle is kept: the hadrons sum to the parton-level resonance
+    cfg = HadronPart(hadron_reshuffle=True, singlet_frame=singlet, semileptonic=0.0, semileptonic_cascade=0.0)
+    stats = {}
+    hadrons = hadronize(partons, cfg, np.random.default_rng(12), stats)
+    steps = n if code == 1 else 2 * n
+    assert stats["hadron_reshuffles"] == steps
+    assert stats["hadron_reshuffle_failed"] < (0.3 if code == 1 else 0.1) * steps
+    if singlet:
+        assert stats["hadron_reshuffle_failed"] <= 0.01 * steps
+    total = _sum(hadrons.event, hadrons.p4, n)
+    # the events whose systems were too heavy are left unchanged (their total mass is above the resonance mass)
+    exact = np.all(np.abs(total - resonance) <= 1e-9 * resonance[:, 3:], axis=1)
+    assert n - exact.sum() <= stats["hadron_reshuffle_failed"]
+    assert np.all(mass(total[~exact]) > mass(resonance[~exact]))
+    assert 0.0 < stats["hadron_reshuffle_residual"] < 1e-8
+    # with the B decays' neutrinos the generator still measures the identity (neutrinos included)
+    stats = {}
+    hadronize(partons, HadronPart(hadron_reshuffle=True, semileptonic=1.0), np.random.default_rng(12), stats)
+    assert stats["hadron_reshuffle_residual"] < 1e-8
+    # on shell: the chain hadrons were boosted rigidly
+    charged = hadrons.species == PI_CH
+    np.testing.assert_allclose(mass(hadrons.p4[charged & ~hadrons.from_b]), MASSES[PI_CH], rtol=1e-4)
+
+
+def test_hadron_reshuffle_keeps_the_w_inside_the_top():
+    partons = _resonance_partons(2)
+    p4, _, _, chain, _ = _fragment(partons, HadronPart(), np.random.default_rng(13), {})
+    stats = {}
+    moved, restored = reshuffle_hadrons(partons, p4, chain, stats)
+    n = len(restored)
+    in_w = partons.prong >= 1
+    w_partons = _sum(partons.event[in_w], partons.p4[in_w], n)
+    w_hadrons = _sum(partons.event[chain[in_w[chain]]], moved[in_w[chain]], n)
+    top = _sum(partons.event[chain], moved, n)
+    # the top and the mass of its W are exact; the W momentum takes the recoil of the b system
+    np.testing.assert_allclose(top[restored], _sum(partons.event, partons.p4, n)[restored], rtol=1e-10, atol=1e-8)
+    w_ok = restored & (np.abs(mass(w_hadrons) - mass(w_partons)) < 1e-6)
+    assert w_ok.sum() >= 0.9 * n
+    # the systems move rigidly: the mass of every b system is kept
+    b = ~in_w[chain]
+    np.testing.assert_allclose(
+        mass(_sum(partons.event[chain[b]], moved[b], n)), mass(_sum(partons.event[chain[b]], p4[b], n)), rtol=1e-7
+    )
+
+
+def test_hadron_reshuffle_switch_changes_only_the_momenta_of_resonances():
+    qcd = _partons(np.linspace(20.0, 300.0, 50))
+    for partons in (qcd, _resonance_partons(1, n=100), _resonance_partons(2, n=100)):
+        off = hadronize(partons, HadronPart(), np.random.default_rng(14))
+        on = hadronize(partons, HadronPart(hadron_reshuffle=True), np.random.default_rng(14))
+        # no random numbers are drawn: the same particles, in the same order, with the same truth
+        for name in ("species", "charge", "event", "index", "prong", "parton", "from_b", "is_ue"):
+            np.testing.assert_array_equal(getattr(on, name), getattr(off, name))
+        if partons is qcd:
+            np.testing.assert_array_equal(on.p4, off.p4)  # QCD jets are not reshuffled
+        else:
+            assert not np.allclose(on.p4, off.p4)
+            # the B-decay vertices follow the moved B hadrons: still parallel to the momentum of their parent
+            np.testing.assert_array_equal(on.vertex == 0, off.vertex == 0)
+
+
+def test_singlet_frame():
+    for code in (1, 2):
+        partons = _resonance_partons(code, n=200)
+        beta = singlet_boosts(partons)
+        in_w = partons.prong >= (code - 1)
+        assert np.all(beta[~in_w] == 0)
+        assert np.all(np.linalg.norm(beta[in_w], axis=1) > 0.5)
+        # in that frame the W quarks sum to zero three-momentum
+        rest = boost(partons.p4, -beta)
+        w = _sum(partons.event[in_w], rest[in_w], int(partons.event.max()) + 1)
+        np.testing.assert_allclose(w[:, :3], 0.0, atol=1e-9 * w[:, 3:].max())
+    assert np.all(singlet_boosts(_partons([50.0, 80.0])) == 0)
+    # the W quarks fragment as at the W mass: fewer hadrons; the energy is conserved in the W rest frame
+    partons = _resonance_partons(1)
+    lab = hadronize(partons, HadronPart(), np.random.default_rng(15))
+    singlet = hadronize(partons, HadronPart(singlet_frame=True), np.random.default_rng(15))
+    assert len(singlet) < 0.8 * len(lab)
+    n = int(partons.event.max()) + 1
+    w = _sum(partons.event, partons.p4, n)
+    beta = w[:, :3] / w[:, 3:]
+    energy = _sum(singlet.event, boost(singlet.p4, -beta[singlet.event]), n)[:, 3]
+    np.testing.assert_allclose(energy, mass(w), rtol=1e-9)
+
+
+def test_w_mass_peak_with_the_singlet_frame_and_the_reshuffle():
+    from itj.toy import generate
+
+    def median_msd(config):
+        data = generate(400, config=config, processes=("wqq",), seed=0)
+        return float(np.median(np.asarray(data["jet_sdmass"], dtype=np.float64)))
+
+    shower = median_msd(preset("shower"))
+    off = median_msd(preset("hadrons", ue=False))
+    lab = median_msd(preset("hadrons", ue=False, hadron_reshuffle=True))
+    singlet = median_msd(preset("hadrons", ue=False, hadron_reshuffle=True, singlet_frame=True))
+    # the chains raise the W peak by about 4 GeV; restoring the whole W in the generation frame overshoots by about
+    # 10 GeV (the extra mass sits in slow hadrons outside the groomed jet); in the W frame the peak returns
+    assert off > shower + 2.0
+    assert lab < shower - 5.0
+    assert abs(singlet - shower) < 1.5 < off - shower

@@ -262,6 +262,8 @@ on log axes: an IRC-safe quantity falls linearly to zero, an unsafe one stays at
   particles, so an IR test probes behaviour outside the training data. This is a result in itself.
 - **The sign of `part_deta`.** A soft particle can move $\eta_\mathrm{jet}$ across 0 and flip the sign of every
   `part_deta`; `keep_sign=True` keeps the sign of the unperturbed jet (`irc_scan` does this).
+- **Zero denominators.** $|\Delta O|/O$ is infinite for a jet with $O = 0$ (about 0.2 % of the detector-level jets
+  have $m_\mathrm{SD} = 0$): leave such jets out, or plot the median of $|\Delta O|/O$ as well.
 
 ## Chunking and memory
 

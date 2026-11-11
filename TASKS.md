@@ -17,8 +17,10 @@ particle), so that every claim about a tagger can be checked on the toy before i
   and the terms in [docs/glossary.md](docs/glossary.md). [notebooks/00_quickstart.ipynb](notebooks/00_quickstart.ipynb)
   and [notebooks/01_jetclass.ipynb](notebooks/01_jetclass.ipynb) are guided first looks at the toy and at JetClass.
 - **Where to run.** A laptop is enough for every core question (Linux, macOS or Windows; CPU only; at most about 15
-  minutes per training run; the times below are for a 2016 six-core CPU, and laptops from 2022 on are 1.5-3 times
-  faster). Every `jetgen` command below is a single line and works in any shell, and
+  minutes per training run; the times below are for an otherwise idle 2016 six-core CPU, and laptops from 2022 on are
+  1.5-3 times faster). Plan on 16 GB of memory: the two ParT-small trainings of T2.4 peak at about 9 and 4 GB, and a
+  weaver run of T4.6 at about 6-7 GB; with 8 GB run them one at a time and close other sessions that hold
+  `t2_detector`. Every `jetgen` command below is a single line and works in any shell, and
   `python examples/make_task_data.py --week 1` (or `--week 2`) makes the data sets of each week. Parts marked
   *GPU (optional)* run on a GPU, on Colab or on a cluster ([examples/cluster](examples/cluster/README.md)).
 - **Write it, then check it.** A question marked "(write your own)" asks you to implement a tool first and then to
@@ -103,6 +105,7 @@ git clone https://github.com/hqucms/inside-the-jet.git
 cd inside-the-jet
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu   # Linux without a GPU: the small CPU build (docs/install.md)
 python -m pip install -e ".[analysis,dev]"
 python -m pytest                 # ends with "... passed, ... deselected": the deselected ones are the slow tests
 python -m ipykernel install --user --name inside-the-jet --display-name "Python (inside-the-jet)"
@@ -123,19 +126,24 @@ jetgen info data/toy_detector_qcd-wqq-tbqq_n3000_seed1.parquet
 ```
 
 ```python
+import numpy as np
+
 from itj.io import load
 
 data = load("data/toy_detector_qcd-wqq-tbqq_n3000_seed1.parquet")
 print(data)  # JetData(3 000 jets: qcd 1 002, wqq 999, tbqq 999; preset detector; ...; with truth)
-jet = data.jet(0)
+i = int(np.flatnonzero(data["label_Wqq"])[0])  # the first W jet (jet 0 is a QCD jet)
+jet = data.jet(i)
 print(jet.jet)  # the per-jet branches: jet_*, label_*, aux_*, truth_*
 print(jet.particles_frame())  # one row per particle: part_* and truth_part_*
 ```
 
-*Predict first:* how many particles does the W jet have at the detector level? Then: how many particles are there at
-each level; where are the prongs; which detector particles come from which prong (`truth_part_prong`) and which from
-the underlying event; what fraction of the jet $p_T$ do the 5 hardest particles carry? Why does the number of
-particles grow by a large factor from `shower` to `hadrons` and shrink again at `detector` (in this toy)?
+*Predict first:* how many particles does the W jet have at the detector level? Then, for the W jet of the display
+(`itj.toy.show_ladder("wqq", seed=1)` returns it at every preset as a `JetData` of one jet, and
+`.jet(0).particles_frame()` works on each; the jets of your file are other events): how many particles are there at each
+level; where are the prongs; which detector particles come from which prong (`truth_part_prong`) and which from the
+underlying event; what fraction of the jet $p_T$ do the 5 hardest particles carry? Why does the number of particles grow
+by a large factor from `shower` to `hadrons` and shrink again at `detector` (in this toy)?
 
 **T0.3** Timing. Time the generation of 1000, 3000 and 10 000 jets for every preset (`data.provenance["wall_time_s"]`)
 and one run with `--workers 4`. Plot the time against $N$ per preset. Which stage dominates
@@ -241,11 +249,14 @@ of them are IRC safe, checked against leading-log formulas and against the store
 **T1.1** The ladder and colour charge. Data: `data/t1_partons.parquet`, `data/t1_shower.parquet`,
 `data/t1_hadrons.parquet`, `data/t1_detector.parquet`; `data/t1_qg_shower.parquet`, `data/t1_qg_hadrons.parquet`,
 `data/t1_qg_detector.parquet`. Using the paired events, plot the multiplicity, the jet mass and
-$p_{T,J}/p_{T,\mathrm{seed}}$ (`truth_seed_pt`) per preset and process. (a) Why is the QCD jet mass 0 at `partons`, and
-the W and top mass the Breit-Wigner mass (`truth_mass`)? The containment rule should keep every prong in the jet: check
-it. (b) Which step changes $N$ most, in this toy? (c) Where does the jet lose $p_T$, and why mostly QCD jets at `shower`
-(hint: compare the angle at which the QCD shower starts with $R$)? (d) The ratio $\langle N_g\rangle/\langle N_q\rangle$
-at three levels against $C_A/C_F = 9/4$: explain the difference ([physics.md](docs/physics.md#multiplicity)).
+$p_{T,J}/p_{T,\mathrm{seed}}$ (`truth_seed_pt`) per preset and process. (a) Why is the QCD jet mass 0 at `partons` (up
+to the float32 rounding of a massless TeV four-vector: about 1 GeV at most), and the W and top mass the Breit-Wigner
+mass (`truth_mass`)? The containment rule should keep every prong in the jet: check it. The rule acts on the resonance
+direction at generation, in rapidity; measured from the final jet axis with `truth_prong_deta` and `truth_prong_dphi` a
+few prongs in $10^4$ lie just outside $R$: explain why. (b) Which step changes $N$ most, in this toy? (c) Where does the
+jet lose $p_T$, and why mostly QCD jets at `shower` (hint: compare the angle at which the QCD shower starts with $R$)?
+(d) The ratio $\langle N_g\rangle/\langle N_q\rangle$ at three levels against $C_A/C_F = 9/4$: explain the difference
+([physics.md](docs/physics.md#multiplicity)).
 
 **T1.2** The Sudakov factor. Data: `data/t1_lund_q.parquet`, `data/t1_lund_g.parquet`. (a) Plot the cumulative
 distribution of the angle of the first emission of the quark jets (`truth_emis_theta` where `truth_emis_depth == 0`;
@@ -261,25 +272,28 @@ repeat for gluons.
 **T1.3** The Lund plane (write your own density). Data: `data/t1_lund_q.parquet` and `data/t1_lund_g.parquet` (truth),
 then `data/t1_detector.parquet`. (a) Histogram the primary emissions `truth_lund_*` as a density per jet and per unit
 area in $(\ln 1/\Delta, \ln k_t)$, with the cutoff line. Measure the plateau in the box $\ln(1/\Delta) \in [0.5, 2.5]$,
-$\ln(k_t/\mathrm{GeV}) \in [0.5, 2.0]$ for quarks and gluons, with errors, and compare it with the leading-log
-density $2\alpha_s C_R/\pi$[^lund] (evaluate it). (b) The ratio g/q against $C_A/C_F$. (c) The reconstructed plane of
-the detector-level jets (`itj.observables.lund_primary`; optionally walk the C/A tree of
+$\ln(k_t/\mathrm{GeV}) \in [0.5, 2.0]$ for quarks and gluons, with errors, and compare it with the leading-log density
+$2\alpha_s C_R/\pi$[^lund] (evaluate it). (b) The ratio g/q against $C_A/C_F$. (c) The reconstructed plane of the
+detector-level jets (`itj.observables.lund_primary`; optionally walk the C/A tree of
 `itj.cluster.cluster(p4, mask, algorithm="ca")` yourself) against the truth: where do hadronisation and the detector
-move the density (low $k_t$, small $\Delta$: the cell size)? About a minute of CPU for the C/A clustering of 60 000
-jets. *Optional:* the same at `shower` and `hadrons`; the plane of W jets (where is the W splitting?). Keep this plane
-in mind for T5.4: the pair features of ParT ($\ln k_T$, $\ln z$, $\ln\Delta$) are the Lund coordinates of every pair
-of particles.
+move the density (low $k_t$, small $\Delta$: the cell size)? About 10-20 seconds of CPU for the C/A clustering of the
+30 000 jets of `t1_detector`. *Optional:* the same at `shower` and `hadrons`; the plane of W jets (where is the W
+splitting?). Keep this plane in mind for T5.4: the pair features of ParT ($\ln k_T$, $\ln z$, $\ln\Delta$) are the Lund
+coordinates of every pair of particles.
 
 **T1.4** Mass and soft drop (write your own mass). Data: `data/t1_lund_q.parquet`, `data/t1_lund_g.parquet`,
-`data/t1_detector.parquet`, `data/t1_detector_noue.parquet`, `data/t1_qg_detector.parquet`. Compute $m_J$ yourself and
-compare it with `itj.observables.mass`. (a) On the fixed-coupling files: plot $\rho\,d\sigma/d\ln\rho$ and compare the
-position of its peak in $\ln(1/\rho)$ with the double-log value and with the value that includes the hard-collinear
-term (both in [physics.md](docs/physics.md#jet-mass); a two-line check, no derivation needed[^peak]); the peak is
-broad, so quote how much its position moves with the bin width and the fit window. Then on
-`t1_qg_detector`: how far do hadronisation, the underlying event and the detector move the peak? (b) $m$ and
-$m_\mathrm{SD}$ per process; with the paired file without underlying event: the shift of $m$ and of $m_\mathrm{SD}$.
-(c) Why does the top $m_\mathrm{SD}$ peak sit below the top mass (think of the neutrinos of semileptonic B decays,
-radiation out of the cone and the detector), and why are the W and top peaks wider than the Breit-Wigner width?
+`data/t1_detector.parquet`, `data/t1_detector_noue.parquet`, `data/t1_qg_shower.parquet`, `data/t1_qg_hadrons.parquet`,
+`data/t1_qg_detector.parquet`. Compute $m_J$ yourself and compare it with `itj.observables.mass`. (a) On the
+fixed-coupling files: plot $\rho\,d\sigma/d\ln\rho$ and compare the position of its peak in $\ln(1/\rho)$ with the
+double-log value and with the value that includes the hard-collinear term (both in
+[physics.md](docs/physics.md#jet-mass); a two-line check, no derivation needed[^peak]); the peak is broad, so quote how
+much its position moves with the bin width and the fit window. Then along the paired quark/gluon ladder (`t1_qg_shower`,
+`t1_qg_hadrons`, `t1_qg_detector`, running coupling; their first 20 000 jets are the same events): how far do
+hadronisation with the underlying event, and then the detector, move the peak? The underlying event alone: `t1_detector`
+against `t1_detector_noue`. (b) $m$ and $m_\mathrm{SD}$ per process; with the paired file without underlying event: the
+shift of $m$ and of $m_\mathrm{SD}$. (c) Why does the top $m_\mathrm{SD}$ peak sit below the top mass (think of the
+neutrinos of semileptonic B decays, radiation out of the cone and the detector), and why are the W and top peaks wider
+than the Breit-Wigner width?
 
 **T1.5** Counting prongs: $\tau_N$ and $D_2$ (write your own $\tau_N$ and $e_2$, $e_3$). Data:
 `data/t1_detector.parquet`, `data/t1_partons.parquet`. With the axes of `itj.observables.subjet_axes`, compute
@@ -318,6 +332,8 @@ peaks with their errors (T1.4).
 - Work on chunks of 2000 jets for anything that builds $(B, N, N)$ arrays (`for chunk in data.chunks(2000)`), and use
   `@` (matmul) for $e_3$, not a three-operand `np.einsum` (much more memory and about 7 times slower).
 - `itj.augment` returns new `part_*` columns: call the observables again on the result.
+- In T1.6, leave out the jets with $O = 0$ before the perturbation (about 0.2 % have $m_\mathrm{SD} = 0$, which makes
+  the mean of $|\Delta O|/O$ infinite), or plot the median of $|\Delta O|/O$ as well.
 - `data.select(data.process_names == "wqq")` keeps the W jets.
 
 [^sudakov]: Take the soft limit of $P_{qq}(z) = C_F(1 + z^2)/(1 - z)$ and write $k_t \approx (1 - z)E\theta$. The
@@ -357,7 +373,8 @@ here on you may use `itj.train.fit` instead of your own loop.
 
 **T2.4** Deep Sets: PFN and EFN (write your own). **First** start the two transformer trainings of T2.5 in a second
 terminal; each uses half of the cores and takes about 20-25 minutes when both run (12 and 9 minutes alone on six
-threads):
+threads). Together they need about 13 GB of memory at their peak: with 8 GB, run them one after the other (or start them
+during T2.1-T2.3 and train your PFN and EFN once they are done).
 
 ```bash
 python examples/train_tagger.py --model partsmall --data data/t2_detector.parquet --train-size 30000 --epochs 5 --out models/toy/partsmall
@@ -369,7 +386,11 @@ $F\bigl(\sum_i z_i\, \Phi(\Delta\eta_i, \Delta\phi_i)\bigr)$, both on `JetBatch`
 that both are invariant under permutations and padding, and that the EFN is exactly collinear safe
 (`split_collinear(delta=0)`). Copy the weights of `itj.models.build_model("pfn")` into your PFN (a key map of a few
 lines) and check that the outputs agree on one batch. Train your two models on 105 000 jets for 10 epochs (about 2-3
-minutes each). What does the PFN see that the EFN cannot?
+minutes each on an otherwise idle CPU; while the two transformers run, give `fit` the free cores with `threads=` and
+expect several times longer). What does the PFN see that the EFN cannot? For the deliverables and for T3, copy your
+trained weights back into `build_model("pfn")` and `build_model("efn")` (the same key map, `load_state_dict`) and save
+those with `save_model`: `predict` without `feature_set=`, `save_model` and `itj.probes.extract` work only on the
+`itj` models.
 
 **T2.5** Graphs and attention. Train `build_model("pnlite")` on 60 000 jets for 5 epochs (about 9 minutes) and collect
 `partsmall` and `partsmall_nopair` (30 000 jets, 5 epochs each, started in T2.4). ParT-small is our ParT-lite (0.24 M
@@ -381,11 +402,12 @@ the training and inference speeds in jets per second. Read [models.md](docs/mode
 *Optional (GPU welcome):* `partlite`, or more training data.
 
 **T2.6** How much data? The AUC (W against QCD) against the training size (1 000, 3 000, 10 000, 30 000, 105 000 jets)
-for the BDT and the PFN (3 seeds below 10 000), with ParT-small at 30 000 (from T2.5); plot it against the training
-time as well. Train every point for the same number of optimiser steps, at least 2000
-(`fit(..., min_steps=2000, patience=5)`), and validate every size on at least 5000 jets: otherwise the small points
-measure under-training, not the size of the data. Where do the curves cross? This curve returns in T6.5. About 15
-minutes of CPU: run it in the background while you write up T2.5.
+for the BDT and the PFN (3 seeds below 10 000), with ParT-small at 30 000 (from T2.5); plot it against the training time
+as well. Give every point at least 2000 planned optimiser steps (`fit(..., min_steps=2000, patience=5)`: `min_steps`
+raises the number of epochs of a small set, and `patience` then stops it at its best validation loss, often after a few
+hundred steps) and validate every size on at least 5000 jets: otherwise the small points measure under-training or a
+noisy choice of epoch, not the size of the data. Where do the curves cross? This curve returns in T6.5. About 15 minutes
+of CPU: run it in the background while you write up T2.5.
 
 **T2.7** Proposals (about 30 minutes): a quark/gluon tagger on `data/t1_qg_detector.parquet` (label set `"qg"`)
 against a cut on the multiplicity and against the EFN; the `kinpid` features; training at `hadrons` and testing at
@@ -431,9 +453,10 @@ for $N$? *Optional:* an MLP probe, PN-lite, `truth_mass`, `truth_dr_min`, probes
 (`extract(..., layers="all")`).
 
 **T3.3** EFN filters. Train an EFN with `build_model("efn", phi_sizes=(100, 100, 8))` (about 2 minutes) and draw its
-filters $\Phi_a(\Delta\eta, \Delta\phi)$ with `itj.plot.efn_filters`. Relate the rings and lobes to the prong
-separation $\Delta R \approx 2m/p_T$ (evaluate it for W and top jets at 600 GeV, and compare with `truth_dr_min` per
-class), as in Fig. 6 of arXiv:1810.05165.
+filters $\Phi_a(\Delta\eta, \Delta\phi)$ with `itj.plot.efn_filters`. Some filters can die in training (a ReLU unit that
+is 0 everywhere; the plot marks them "dead"): that is a result to report, and another `seed` gives another set. Relate
+the rings and lobes to the prong separation $\Delta R \approx 2m/p_T$ (evaluate it for W and top jets at 600 GeV, and
+compare with `truth_dr_min` per class), as in Fig. 6 of arXiv:1810.05165.
 
 **T3.4** Comparing representations with CKA (write your own linear CKA). Check it against `itj.probes.linear_cka`;
 check that it is invariant under orthogonal maps and isotropic scaling, but not under general linear maps. Compute
@@ -443,12 +466,13 @@ $X_\mathrm{phys} = [m_\mathrm{SD}, \tau_{21}, \tau_{32}, D_2, N, \ln p_T]$. Whic
 ParT-small seed (12 minutes).
 
 **T3.5** Mass sculpting and decorrelation. Cut the W-against-QCD score of the PFN at $\epsilon_S = 50\,\%$ and compare
-the $m_\mathrm{SD}$ distribution of the QCD jets before and after the cut (`itj.metrics.sculpting_jsd`). Retrain the
-PFN with planing weights that make $m_\mathrm{SD}$ flat in each class (write the weights yourself: 20 bins in
-[40, 250] GeV, normalised per class to the number of jets of the class, capped at 10; pass them with
-`JetDataset(weights=...)`), and plot $R_{50}$ against $1/\mathrm{JSD}$ for both PFNs (2 trainings of about 3 minutes).
-Then evaluate both on `data/t3_w60.parquet`, `data/t3_w80.parquet`, `data/t3_w100.parquet` and `data/t3_w120.parquet`
-(two-prong jets at other masses): does the decorrelated tagger keep tagging? *Optional:* DisCo (arXiv:2001.05310).
+the $m_\mathrm{SD}$ distribution of the QCD jets before and after the cut (`itj.metrics.sculpting_jsd`). Retrain the PFN
+with planing weights that make $m_\mathrm{SD}$ flat in each class (write the weights yourself: 20 bins in [40, 250] GeV,
+the jets outside the range keep the weight 1, then normalise per class to the number of jets of the class and cap at 10;
+pass them with `JetDataset(weights=...)`), and plot $R_{50}$ against $1/\mathrm{JSD}$ for both PFNs (2 trainings of
+about 3 minutes). Then evaluate both on `data/t3_w60.parquet`, `data/t3_w80.parquet`, `data/t3_w100.parquet` and
+`data/t3_w120.parquet` (two-prong jets at other masses): does the decorrelated tagger keep tagging? *Optional:* DisCo
+(arXiv:2001.05310).
 
 **T3.6** Counterfactual jets. Evaluate the T2 taggers on `data/t3_w80.parquet` and on the paired
 `data/t3_w80_noue.parquet`, `data/t3_w80_centre.parquet` and `data/t3_w80_nocoh.parquet` (the same hard processes, one
@@ -553,18 +577,21 @@ CPU. *Optional:* (b) the JetClass models of T4.4 on the toy; the score distribut
 the two data sets; fine-tuning the toy EFN on 1 000 or 10 000 JetClass jets against training from scratch (a preview
 of T6.5).
 
-**T4.6** weaver. If `import weaver` failed in T0.4, do (a) with `itj` only and say so. (a) A short CPU run (about 35
-s): train a ParT of the size of `partsmall` for 30 steps with `jets3_kin.yaml` (`jetgen configs` prints its path) on
-the split toy files, then the identical command on the JetClass split files (one named group per class). Then run
-`weaver --predict` with the pretrained `ParT_kin` (`JetClass_kin.yaml`, `--data-fraction 0.05`, `--gpus ''`) on the
-split test files of JetClass. In test mode weaver reads the first `--data-fraction` of every file in order, so its
-jets are `load(path, max_jets=1000)` of each split test file (e.g. `data/jetclass/split/test/WToQQ_120.parquet`):
-compare its scores with those of `itj` and report the largest difference. Read the confusion matrix. Finally load the
-checkpoint of the toy run into `itj` with `load_model(path, name="partsmall")`. The toy run, as one line (the others
-are in [examples/weaver/README.md](examples/weaver/README.md)):
+**T4.6** weaver. If `import weaver` failed in T0.4, do (a) with `itj` only and say so. (a) A short CPU run (about 1
+minute, 6-7 GB of memory): train a ParT of the size of `partsmall` for 30 steps at a constant learning rate
+(`--lr-scheduler none`) with `jets3_kin.yaml` (`jetgen configs` prints its path) on the split toy files, then the
+identical command on the JetClass split files (one named group per class). Then run `weaver --predict` with the
+pretrained `ParT_kin` (`JetClass_kin.yaml`, `--data-fraction 0.05`, `--gpus ''`) on the split test files of JetClass. In
+test mode weaver reads the first `--data-fraction` of every file in order, so its jets are `load(path, max_jets=1000)`
+of each split test file (e.g. `data/jetclass/split/test/WToQQ_120.parquet`): compare its scores with those of `itj` and
+report the largest difference. Read the confusion matrix (after 30 steps expect an accuracy of about 0.6-0.7; an
+accuracy near 1/3, chance for three classes, means the learning rate did not reach the run). Finally load the
+checkpoint of the toy run into `itj` with
+`load_model(path, name="partsmall")`. The toy run, as one line (the others are in
+[examples/weaver/README.md](examples/weaver/README.md)):
 
 ```bash
-weaver --data-train 't2:data/t2_split/train/t2_detector.parquet' --data-val data/t2_split/val/t2_detector.parquet --data-test 't2:data/t2_split/test/t2_detector.parquet' --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3 -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4 --model-prefix runs/weaver_partsmall/net --gpus '' --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1 --steps-per-epoch 30 --in-memory --fetch-step 1 --predict-output pred.parquet
+weaver --data-train 't2:data/t2_split/train/t2_detector.parquet' --data-val data/t2_split/val/t2_detector.parquet --data-test 't2:data/t2_split/test/t2_detector.parquet' --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3 -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4 --model-prefix runs/weaver_partsmall/net --gpus '' --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1 --steps-per-epoch 30 --lr-scheduler none --in-memory --fetch-step 1 --predict-output pred.parquet
 ```
 
 (b) *GPU (optional):* a full ParT or ParticleNet training on the three-class subset
@@ -724,16 +751,17 @@ encoder linearly as in T6.4.
 
 **T7.2** Shortcut hunting. (a) A known shortcut: train a PFN with the particle types,
 `build_model("pfn", feature_set="kinpid")` (3 minutes), on `data/t7_shortcut.parquet` (W jets with a $\pi^0$ share of
-0.50 instead of the default) and evaluate it on clean W jets (`data/t2_detector.parquet`). Can
-saliency, IG summed by particle type or a probe for the photon fraction find the shortcut without being told? (b) A
-hidden shortcut: `data/t7_mystery.parquet` holds one of the five shortcuts of
-[physics.md](docs/physics.md#planted-shortcuts). Find it with the tools of T3 and T5 and with counterfactual edits,
-remove it, and only then run `jetgen info data/t7_mystery.parquet --reveal`.
+0.50 instead of the default) and evaluate it on clean W jets (`data/t2_detector.parquet`). Can saliency, IG summed by
+particle type or a probe for the photon fraction find the shortcut without being told? (b) A hidden shortcut:
+`data/t7_mystery.parquet` holds one of the five shortcuts of [physics.md](docs/physics.md#planted-shortcuts). A first
+look at the counts per class (`jetgen info`, the truth columns) is part of the hunt and may already point at a suspect;
+the task is to show with the tools of T3 and T5 and with counterfactual edits that a tagger trained on the file uses it,
+to remove it and only then to run `jetgen info data/t7_mystery.parquet --reveal`.
 
 **T7.3** A paper from the frontier: one of arXiv:2412.03673, arXiv:2512.00210, arXiv:2605.09881 and arXiv:2401.13537.
-Reproduce one figure qualitatively on the toy, or probe every block of `ParT_full` on all ten classes (the example
-file, `data/jetclass/example/JetClass_example_100k.root`, 20 000 jets, about 1.5 minutes of inference) and compare
-with arXiv:2412.03673.
+Reproduce one figure qualitatively on the toy, or probe every block of `ParT_full` on all ten classes (the example file,
+`data/jetclass/example/JetClass_example_100k.root`: `itj.jetclass.load_jetclass("example", ("all",), part="test")` gives
+2 000 jets of each class, about 1.5 minutes of inference) and compare with arXiv:2412.03673.
 
 **T7.4** A research proposal (one page): the question, why it matters, the data, the method, the first experiment and
 its figure, what would change your mind, the compute and the risks; motivated by one of your results of T1 to T6.
@@ -743,6 +771,7 @@ shortcut away (T7.2); one figure (T7.3); the proposal (T7.4).
 
 **Hints**
 - T7.2: compare the counts of each particle type between the classes before you train anything.
-- The provenance of the mystery file hides the override (`jetgen info --reveal` prints it); the mapping from the seed
-  to the shortcut is in the source code, so do not read `itj.toy.mystery` before you are done.
+- The provenance of the mystery file holds the override only scrambled (`jetgen info --provenance` shows a placeholder,
+  `jetgen info --reveal` prints it); the mapping from the seed to the shortcut and the scrambling are in the source
+  code, so do not read `itj.toy.mystery` before you are done.
 - T7.3: the example file is ROOT; `load` reads it with the `analysis` extra.

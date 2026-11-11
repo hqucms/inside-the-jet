@@ -47,7 +47,8 @@ __all__ = [
     "threshold_at",
 ]
 
-#: The columns of ``results_table.csv`` (one row per trained or evaluated model, T2 to T6).
+#: The columns of ``results_table.csv`` (one row per trained or evaluated model, T2 to T6); the ``*_err`` columns
+#: hold the bootstrap errors (:func:`bootstrap`) and stay empty when unknown.
 RESULT_COLUMNS: tuple[str, ...] = (
     "model",
     "train_data",
@@ -59,6 +60,11 @@ RESULT_COLUMNS: tuple[str, ...] = (
     "auc_top",
     "r50_top",
     "r80_top",
+    "auc_w_err",
+    "r50_w_err",
+    "auc_top_err",
+    "r50_top_err",
+    "r80_top_err",
     "accuracy",
     "n_params",
     "train_time_s",

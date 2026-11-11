@@ -1,5 +1,8 @@
 """Planted shortcuts of T7.2: the choice from the seed, one process changed, hidden from describe, reveal."""
 
+import base64
+import json
+
 import numpy as np
 import pytest
 
@@ -7,7 +10,7 @@ import itj.toy
 from itj.io import describe, load, read_metadata
 from itj.toy import generate, preset
 from itj.toy.cli import main
-from itj.toy.mystery import SHORTCUTS, decode, encode, mystery_overrides, reveal
+from itj.toy.mystery import HIDDEN, SHORTCUTS, decode, encode, hide, mystery_overrides, reveal
 
 
 def test_shortcuts_are_valid_overrides():
@@ -38,15 +41,41 @@ def test_not_reexported():
         assert not hasattr(itj.toy, name)
 
 
-def test_encode_decode():
-    payload = decode(encode(5))
+def test_encode_decode(monkeypatch):
+    monkeypatch.delenv("ITJ_MYSTERY_KEY", raising=False)
+    text = encode(5)
+    payload = decode(text)
     overrides = mystery_overrides(5)
     assert {payload["process"]: {payload["field"]: payload["value"]}} == overrides
     with pytest.raises(ValueError, match="cannot decode"):
         decode("not base64!")
+    # a base64 decoder alone does not reveal it
+    raw = base64.b64decode(text.split(":", 1)[1])
+    for name, process, field, _ in SHORTCUTS:
+        for word in (name, process, field):
+            assert word.encode() not in raw
+    # files of 0.1.0 (plain base64 of JSON) still decode
+    legacy = base64.b64encode(json.dumps(payload).encode()).decode()
+    assert decode(legacy) == payload
+    # an instructor's key scrambles differently and is needed to reveal
+    monkeypatch.setenv("ITJ_MYSTERY_KEY", "123457")
+    private = encode(5)
+    assert decode(private)["key_set"] is True
+    monkeypatch.delenv("ITJ_MYSTERY_KEY")
+    with pytest.raises(ValueError, match="ITJ_MYSTERY_KEY"):
+        decode(private)
 
 
-def test_mystery_file_differs_from_a_clean_file_in_one_process(tmp_path, monkeypatch):
+def test_hide():
+    provenance = {"seed": 3, "mystery": "x1:abc", "merged": [{"path": "a", "provenance": {"mystery": "x1:def"}}, 4]}
+    hidden = hide(provenance)
+    assert hidden["mystery"] == HIDDEN
+    assert hidden["merged"][0]["provenance"]["mystery"] == HIDDEN
+    assert hidden["merged"][1] == 4
+    assert provenance["mystery"] == "x1:abc"  # a copy
+
+
+def test_mystery_file_differs_from_a_clean_file_in_one_process(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("ITJ_MYSTERY_KEY", raising=False)
     seed = 73
     path = tmp_path / "mystery.parquet"
@@ -72,6 +101,11 @@ def test_mystery_file_differs_from_a_clean_file_in_one_process(tmp_path, monkeyp
     assert field not in text
     assert process not in text.split("process")[0]  # only in the table of jet counts
     assert "mystery" in meta["provenance"]
+    capsys.readouterr()
+    assert main(["info", str(path), "--provenance"]) == 0
+    printed = capsys.readouterr().out
+    assert HIDDEN in printed
+    assert meta["provenance"]["mystery"] not in printed
     # revealed on request
     revealed = reveal(path)
     assert field in revealed

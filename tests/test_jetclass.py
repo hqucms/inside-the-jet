@@ -276,6 +276,15 @@ def test_load_jetclass_example(tmp_path):
     only = load_jetclass("example", ("QCD",), columns=["jet_pt"], root=tmp_path / "jetclass")
     assert only.names == ("jet_pt",)
     assert len(only) == 50
+    # the file holds the classes in blocks: the part is taken within each class, not of the whole file
+    test = load_jetclass("example", ("all",), part="test", root=tmp_path / "jetclass")
+    counts = {name: int((test.process_names == name).sum()) for name in set(test.process_names.tolist())}
+    assert len(counts) == len(set(sample.process_names.tolist()))
+    assert set(counts.values()) == {10}
+    qcd_test = load_jetclass("example", ("QCD",), part="test", columns=["jet_pt"], root=tmp_path / "jetclass")
+    np.testing.assert_array_equal(qcd_test["jet_pt"], only["jet_pt"][:10])
+    with pytest.raises(ValueError, match="no jets of the classes"):
+        load_jetclass("example", ("QCD",), part="test", max_jets_per_class=0, root=tmp_path / "jetclass")
 
 
 # ------------------------------------------------------------------------------------------------------- network

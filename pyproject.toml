@@ -60,6 +60,7 @@ ml = [
 # Python 3.10-3.13 in practice; install torch first.
 weaver = [
     "weaver-core==0.5.4",
+    "tabulate>=0.9",  # weaver's FLOP count prints an ERROR line without it
 ]
 dev = [
     "mypy>=1.10",

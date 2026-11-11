@@ -101,6 +101,11 @@ def extract(
 
     from .models import make_inputs
 
+    if not callable(getattr(model, "trace", None)):
+        raise TypeError(
+            f"extract needs an itj Tagger with a trace method, not a {type(model).__name__}: copy the weights of your "
+            "own model into build_model(...) with load_state_dict (the key map of T2.4)"
+        )
     if layers not in ("embedding", "all"):
         raise ValueError(f"layers must be 'embedding' or 'all', got {layers!r}")
     if batch_size < 1:

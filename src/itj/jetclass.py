@@ -315,16 +315,23 @@ def _download(url: str, target: Path, info: FileInfo, *, progress: bool) -> None
         mode = "ab" if offset and status == 206 else "wb"
         done = offset if mode == "ab" else 0
         shown = -1
+        # a terminal gets one updating line; a log file (a job, a redirect, a notebook) one line per 25 %
+        live = sys.stderr.isatty()
+        step = 1 if live else 25
         with open(part, mode) as f:
             for block in iter(lambda: response.read(_CHUNK), b""):
                 f.write(block)
                 done += len(block)
                 if progress and info.size:
-                    percent = int(100 * done / info.size)
+                    percent = int(100 * done / info.size) // step * step
                     if percent != shown:
                         shown = percent
-                        print(f"\r  {target.name}: {percent:3d} % of {_mb(info.size)}", end="", file=sys.stderr)
-        if progress:
+                        text = f"  {target.name}: {percent:3d} % of {_mb(info.size)}"
+                        if live:
+                            print(f"\r{text}", end="", file=sys.stderr, flush=True)
+                        else:
+                            print(text, file=sys.stderr, flush=True)
+        if progress and live:
             print(file=sys.stderr)
     size = part.stat().st_size
     if size != info.size:
@@ -343,16 +350,16 @@ def _fetch_files(
 ) -> list[Path]:
     """Download (url, info, target) items, keeping targets whose size and MD5 match."""
     total = sum(info.size for _, info, _ in items)
-    print(f"{title}: {len(items)} file{'s' if len(items) != 1 else ''}, {_mb(total)}")
+    print(f"{title}: {len(items)} file{'s' if len(items) != 1 else ''}, {_mb(total)}", flush=True)
     paths = []
     for url, info, target in items:
         if dry_run:
-            print(f"  {url} -> {target}")
+            print(f"  {url} -> {target}", flush=True)
         elif not overwrite and _matches(target, info):
-            print(f"  {target} exists with the right size and MD5: kept")
+            print(f"  {target} exists with the right size and MD5: kept", flush=True)
         else:
             if progress:
-                print(f"  {url} -> {target}")
+                print(f"  {url} -> {target}", flush=True)
             _download(url, target, info, progress=progress)
         paths.append(target)
     return paths
@@ -492,10 +499,10 @@ def load_jetclass(
         Short names or prefixes, or ``("all",)``. For ``"example"`` the jets of these classes are selected from the
         one ROOT file (needs the ``analysis`` extra).
     part : {"train", "val", "test"}, optional
-        The idx split of each file (:func:`itj.io.load`); for ``"example"`` of the whole file before the classes
-        are selected.
+        The idx split of each file (:func:`itj.io.load`); for ``"example"``, whose ROOT file holds the classes in
+        blocks of 10 000 jets, the same split within the jets of each class (test: the first 20 % of every class).
     max_jets_per_class : int, optional
-        At most this many jets per class (the first ones).
+        At most this many jets per class (the first ones of the part).
     columns : sequence of str, optional
         Columns to read (default: all 41).
     root : str or os.PathLike
@@ -505,20 +512,29 @@ def load_jetclass(
     -------
     JetData
         ``source="jetclass"``.
+
+    Raises
+    ------
+    ValueError
+        For ``"example"``, if none of the classes is in the file.
     """
-    from .io import load
+    from .io import _part_range, load
 
     paths = files(split, classes, root=root)
     if split != "example":
         return load(paths, columns=columns, part=part, max_jets=max_jets_per_class)
     shorts = class_names(classes)
     wanted = None if columns is None else list(dict.fromkeys([*columns, *(c.label for c in CLASSES)]))
-    data = load(paths[0], columns=wanted, part=part)
+    data = load(paths[0], columns=wanted)
     process = data.process_names
     rows = []
     for short in shorts:
         index = np.flatnonzero(process == short.lower())
-        rows.append(index if max_jets_per_class is None else index[:max_jets_per_class])
-    data = data.select(np.sort(np.concatenate(rows)))
+        start, stop = _part_range(len(index), part, max_jets_per_class)
+        rows.append(index[start:stop])
+    selected = np.sort(np.concatenate(rows))
+    if len(selected) == 0:
+        raise ValueError(f"no jets of the classes {', '.join(shorts)} (part {part!r}) in {paths[0]}")
+    data = data.select(selected)
     extra = [] if columns is None else [n for n in data.names if n not in columns]
     return data.drop(*extra) if extra else data

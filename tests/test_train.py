@@ -161,3 +161,28 @@ def test_predict(jetclass_sample: JetData, dataset: JetDataset) -> None:
     assert predict(mlp, jetclass_sample).shape == (150, 3)
     with pytest.raises(ValueError, match="feature_set"):
         predict(model, JetDataset(jetclass_sample, "kinpid"))
+
+
+def test_own_model_gets_clear_errors(jetclass_sample: JetData, tmp_path: Any) -> None:
+    """A student's own nn.Module (T2.4): predict asks for feature_set, save_model and extract say what to do."""
+    from itj.models import save_model
+    from itj.probes import extract
+
+    class Own(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.phi = torch.nn.Linear(7, 4)
+            self.out = torch.nn.Linear(4, 3)
+
+        def forward(self, batch: Any) -> torch.Tensor:
+            x = self.phi(batch.features.transpose(1, 2)) * batch.mask.reshape(len(batch), -1, 1)
+            return self.out(x.sum(dim=1))
+
+    own = Own()
+    with pytest.raises(ValueError, match="pass feature_set"):
+        predict(own, jetclass_sample)
+    assert predict(own, jetclass_sample, feature_set="kin").shape == (150, 3)
+    with pytest.raises(TypeError, match="build_model"):
+        save_model(own, tmp_path / "own.pt")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="build_model"):
+        extract(own, jetclass_sample)  # type: ignore[arg-type]

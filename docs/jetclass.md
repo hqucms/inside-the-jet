@@ -37,8 +37,8 @@ The hard processes were generated with MadGraph5_aMC@NLO, showered and hadronise
 parton interactions, without pileup), and passed through Delphes with the CMS card. Jets are clustered from the
 particle-flow candidates with anti-kT, $R = 0.8$, and kept for $500 < p_T < 1000$ GeV and $|\eta| < 2$. Signal jets are
 kept only if all decay products of the resonance lie inside the jet. The substructure branches follow the Delphes
-conventions: soft drop with $\beta = 0$, $z_\mathrm{cut} = 0.1$, and N-subjettiness with $\beta = 1$, most likely with
-one-pass minimised kT axes ([observables.md](observables.md#jetclass-conventions)).
+conventions: soft drop with $\beta = 0$, $z_\mathrm{cut} = 0.1$, and N-subjettiness with $\beta = 1$; which axes
+reproduce the stored $\tau_N$ is task T4.2 ([observables.md](observables.md#jetclass-conventions) has the answer).
 
 ## Field names
 
@@ -104,10 +104,13 @@ the MD5 of every file, and keeps a file that is already there and correct. The t
 | `WToQQ_120.parquet` | 103 488 757 | `2e8cd393e8f9c3de2abc8bbb4db41013` |
 | `TTBar_120.parquet` | 158 634 524 | `c9b6e734e68fe697ce425789d5c7a9ff` |
 
-`itj.jetclass.MANIFEST` holds the sizes and MD5s of all 21 files (ten classes in two splits, and the example).
-**Without access to the mirror**, a teacher can put the files on a local share (or a USB stick) and every student runs
-`jetgen fetch jetclass --base-url URL` (an `http://` or `file://` URL of the directory, or the environment variable
-`ITJ_JETCLASS_URL`); the MD5s check the copies. The ROOT example needs `uproot` and `awkward` (the `analysis` extra).
+`itj.jetclass.MANIFEST` holds the sizes and MD5s of all 21 files (ten classes in two splits, and the example). **Without
+access to the mirror**, a teacher can put the files on a local share (or a USB stick) and every student runs
+`jetgen fetch jetclass --base-url URL` (or sets the environment variable `ITJ_JETCLASS_URL`); the MD5s check the copies.
+`URL` is an `http://` or `file://` URL of a directory laid out as the mirror, with one folder per split:
+`URL/val/WToQQ_120.parquet`, `URL/train/WToQQ_000.parquet`, `URL/example/JetClass_example_100k.root`. A flat folder of
+Parquet files needs a `val/` folder around them (a symbolic link is enough). The ROOT example needs `uproot` and
+`awkward` (the `analysis` extra).
 
 ## Models and numbers
 
@@ -129,10 +132,8 @@ not contain, so the two accuracies differ.
 
 For scale: small ParT models (18 k to 0.9 M parameters) trained on a few hundred thousand jets of all ten classes
 reach about 0.70-0.76 accuracy (the scaling study of the dl4hep notebooks); the full ParT reaches 0.861 with 100 M
-jets. Zeroing the pair bias of `ParT_kin` at inference drops its accuracy on top jets (argmax over the ten outputs)
-from about 0.91 to 0.11, most jets becoming `Tbl` (after `probs_to_jets3`: from 0.95 to 0.62), while
-retraining without the pair bias costs only about 0.015 in the W against QCD AUC
-([methods.md](methods.md#pair-feature-ablation)).
+jets. What zeroing the pair bias of `ParT_kin` does, and why it says little, is a *predict first* question of T5.4;
+the numbers are in [methods.md](methods.md#pair-feature-ablation), to read after your prediction.
 
 ## weaver in one page
 
@@ -166,6 +167,7 @@ optionally `get_loss`. `-o key value` (repeatable) passes keyword arguments, eva
 | `--in-memory` | load and preprocess the data once: right for small subsets |
 | `--fetch-step 1` | read each Parquet file in one piece; weaver 0.5.4 fails on a partial read of a Parquet file ("could not broadcast input array") with the default 0.01 |
 | `--batch-size`, `--start-lr`, `--num-epochs`, `--steps-per-epoch` | the training loop (the default optimiser is `ranger`) |
+| `--lr-scheduler none` | a constant learning rate; with `--num-epochs 1` the default `flat+decay` runs the whole epoch at 1 % of `--start-lr`, so a short run learns nothing |
 | `--predict`, `--predict-output` | test mode; a `.parquet` output holds `scores` (softmax, $N \times C$), `_label_` and the observers; a bare file name goes to `predict_output/` next to the model; named test groups give one file each |
 | `--data-fraction` | the fraction of each file to read; in test mode the first fraction of every file, in order |
 | `--load-model-weights`, `--freeze-model-weights`, `--exclude-model-weights` | start from a checkpoint, freeze or skip layers by regex (fine-tuning, linear probes) |

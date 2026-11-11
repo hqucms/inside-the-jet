@@ -238,6 +238,18 @@ def test_reshuffle_is_exact():
     np.testing.assert_allclose(direction[ok.repeat(s)], q_dir[ok.repeat(s)], atol=1e-9)
 
 
+def test_reshuffle_keeps_the_mass_of_a_single_hadron():
+    # two systems of one particle each: a massive hadron keeps its mass, a massless one stays massless
+    q = np.array([[[10.0, 0.0, 0.0], [-10.0, 0.0, 0.0]]])
+    pion = np.array([3.0, 1.0, 0.5, np.sqrt(9.0 + 1.0 + 0.25 + 0.13957**2)])
+    photon = np.array([-4.0, 0.0, 0.0, 4.0])
+    moved, ok = reshuffle(q, np.stack([pion, photon]), np.array([0, 1]), np.array([25.0]))
+    assert ok.all()
+    np.testing.assert_allclose(mass(moved[:1]), 0.13957, rtol=1e-9)
+    np.testing.assert_allclose(moved[1, 3], np.linalg.norm(moved[1, :3]), rtol=1e-12)
+    np.testing.assert_allclose(moved.sum(axis=0), [0.0, 0.0, 0.0, 25.0], atol=1e-9)
+
+
 @pytest.mark.parametrize("code", [1, 2])
 def test_resonance_partons_sum_to_the_resonance(code):
     cfg = preset("shower")

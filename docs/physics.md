@@ -348,6 +348,12 @@ $10^{-9}$ internally). Rescaling the post-shower momenta instead, without the pr
 momentum of a few GeV in the rest frame. The emission record (`truth_emis_*`) keeps the kinematics as generated,
 before the reshuffle; `truth_parton_*` holds the final partons after it.
 
+The top is reshuffled in one step with its three systems, so the top four-momentum is exact, but the W inside it is not:
+the masses of the two W systems take their share of $k$ from the b system as well. At the parton level the W inside a
+top has the median mass 82.5 GeV (16-84 %: 79.8-88.8 GeV) for 80.4 GeV (78.8-82.0 GeV) in the hard process, and 48 % of
+the tops move it by more than 2 GeV; a W jet keeps its mass exactly. A two-step reshuffle (first the two W systems onto
+the hard W, then the b system and the W system onto the top) would fix this, but it changes the default output.
+
 ### Start angles and colour coherence
 
 At leading log, soft gluons emitted at angles larger than the opening of a colour-connected pair see only the total
@@ -389,6 +395,8 @@ hardest primary emission). [data_format.md](data_format.md#truth-branches) lists
 | chain stop, smallest hadron energy      | $E_\mathrm{stop}$ | `e_stop`, `e_min_hadron` | 1.5, 0.6      | GeV  |
 | $\pi^0$ share, neutral-hadron share     |               | `pi0_fraction`, `neutral_fraction` | 0.34, 0.13 (cal.) |  |
 | kaon share of charged, $K_L$ share of neutral |         | `kaon_fraction`, `klong_fraction` | 0.15, 0.60 |      |
+| W quarks fragment in the W rest frame   |               | `singlet_frame`              | off           |      |
+| hadron-level reshuffle of W and top     |               | `hadron_reshuffle`           | off           |      |
 | B hadrons                               |               | `b_hadrons`                  | on            |      |
 | B: $c\tau$, $\langle z_B\rangle$, decay multiplicity, charged share | | `b_ctau`, `b_frag_mean`, `b_decay_multiplicity`, `b_charged_share` | 0.46, 0.7, 7, 0.7 | mm, -, -, - |
 | semileptonic probability per lepton flavour, cascade | | `semileptonic`, `semileptonic_cascade` | 0.11, 0.10 |   |
@@ -441,6 +449,90 @@ a muon; with the probability `semileptonic_cascade` = 0.10 per flavour one more 
 Every semileptonic lepton comes with one daughter turned into an invisible neutrino, which is dropped: it lowers the
 visible top mass as in JetClass. The daughters carry `truth_part_from_b` = 1 and their production vertex, which the
 detector turns into impact parameters.
+
+### Hadron-level reshuffle
+
+The chains conserve the energy of their partons but not the momentum, so every resonance system gains invariant
+mass. In the generation frame the summed hadrons of a W weigh 98 GeV (median, every hadron, before the B decays) for a
+parton-level 80.4 GeV, those of a top 186 GeV for 172.5 GeV. Most of the excess comes from the transverse kicks of the
+chains, which open up the soft hadrons: with `kt_sigma` = 0 the W hadrons weigh 86.8 GeV, with 0.12 GeV 90.3 GeV. The
+hadron masses and the energy floors give the rest; dropping the hadrons at the floors ($E \le 0.65$ GeV) takes the W
+from 98.4 to 92.6 GeV, and lowering `e_min_hadron` to 0.2 GeV changes nothing (98.5 GeV). The groomed jet sees only
+part of the excess ($m_\mathrm{SD}$ of the W 79.8 GeV at the `shower` level, 83.9 GeV at `hadrons`). Two switches act
+on W and top jets; both are **off** by default.
+
+**`hadron_reshuffle`** (experimental) restores the four-momentum of every W and top with the recipe of the
+[resonance reshuffle](#resonance-reshuffle), applied to the hadrons before the B and $\pi^0$ decays (their decay
+products, neutrinos included, follow the parent). The hadrons of all chains of one prong form a system $i$ of mass
+$m_i$; in the rest frame of the parton-level resonance momentum $P$, with $\mathbf{q}_i$ the parton-level momentum of
+system $i$ there, solve $\sum_i \sqrt{k^2|\mathbf{q}_i|^2 + m_i^2} = M$, boost each system rigidly to $k\mathbf{q}_i$
+and boost back. A W is one step (its two quarks); a top is two: first the W inside it (its two quarks, target the
+parton-level W), then the top (the b system and the W system), so that, when both steps succeed, the top and its W
+keep their parton-level masses (for the W inside a top that is the mass after the one-step shower reshuffle, about
+2 GeV above the generated W mass, see [Resonance reshuffle](#resonance-reshuffle)). Afterwards the hadrons of every
+restored W and top, with all decay products, sum to $P$ to a few $10^{-9}$ (the rounding of the boosted $\pi^0$ and B
+decays; the reshuffle itself is exact to $10^{-13}$; the identity `hadron_sum` of
+[data_format.md](data_format.md#exact-identities)). A step whose systems are heavier than the resonance
+($\sum_i m_i \ge M$) leaves its hadrons unchanged and is counted in `provenance["hadron_reshuffle"]` (`failed`, and
+`failed_w_in_top` for the first step of a top: such a top is still restored, its W is not). No random number is drawn:
+the same particles come out in the same order, only the momenta of W and top jets move, and every pairing of
+[Reproducibility](#reproducibility) still holds.
+
+**`singlet_frame`** runs the chains of the two quarks of every W (also inside a top) in the rest frame of the W, the
+frame of their colour singlet, and boosts the hadrons back. Independent fragmentation is not Lorentz invariant:
+in the generation frame each quark of a boosted W fragments as if it had a colour partner of its own energy far away
+(the hadrons of an e+e- event at twice its energy), in the W frame the pair fragments as an e+e- event at the W mass.
+QCD jets (whose colour partner is outside the jet) and the b of a top (colour-connected to the outside) keep the
+generation frame. The energy is then conserved per chain in the W frame, and the W system almost conserves its
+four-momentum by itself (98 GeV becomes 80.3 GeV).
+
+Five seeds of 10 000 jets with `jetclass_selection` (QCD, W, top; medians, window fractions and multiplicities of
+the validation table):
+
+| level, switches | m_SD W / top [GeV] | window W / top | $\tau_{21}$ W | $\tau_{32}$ top | N W / top |
+|---|---|---|---|---|---|
+| `shower` | 79.8 / 172.0 | 0.81 / 0.84 | 0.171 | 0.251 | 4.8 / 6.8 |
+| `hadrons` | 83.9 / 174.8 | 0.79 / 0.84 | 0.335 | 0.454 | 51.6 / 69.9 |
+| `hadrons`, `hadron_reshuffle` | 67.8 / 162.3 | 0.57 / 0.81 | 0.410 | 0.502 | 53.2 / 72.3 |
+| `hadrons`, `singlet_frame` | 79.6 / 172.0 | 0.81 / 0.84 | 0.288 | 0.434 | 31.4 / 55.4 |
+| `hadrons`, both | 79.6 / 167.6 | 0.81 / 0.83 | 0.288 | 0.441 | 31.4 / 56.1 |
+| `detector` (default) | 81.6 / 169.8 | 0.78 / 0.82 | 0.364 | 0.471 | 38.0 / 53.2 |
+| `detector`, `hadron_reshuffle` | 66.2 / 157.0 | 0.53 / 0.77 | 0.438 | 0.516 | 39.8 / 55.2 |
+| `detector`, `singlet_frame` | 78.8 / 168.7 | 0.80 / 0.82 | 0.330 | 0.455 | 25.3 / 44.9 |
+| `detector`, both | 78.9 / 164.3 | 0.80 / 0.81 | 0.330 | 0.463 | 25.3 / 45.5 |
+| JetClass | 77.3 / 164.9 | 0.68 / 0.69 | 0.366 | 0.501 | 32.2 / 50.9 |
+
+The toy $\tau_N$ use WTA-kT axes, the JetClass ones are the stored branches (one-pass kT axes). With one-pass kT axes
+for the toy as well the conclusions hold; only $\tau_{21}$ of the W with `hadron_reshuffle` moves, from 0.438 to 0.445,
+just outside the accepted range of `tau21_w` (at most 0.44). Of the validation table, `hadron_reshuffle` fails
+`msd_median_w` and `msd_window_w` and sits at the edge of `msd_median_top` (157.0 GeV, at least 156) and `tau21_w`;
+`singlet_frame` fails `n_w`.
+
+In the generation frame the reshuffle overcorrects: it takes the 18 GeV of excess mass out of the relative motion of the
+hard cores of the prongs (the prong systems keep their inflated masses, medians 40 and 17 GeV for the two prongs of a W,
+against 16 and 10 GeV with `singlet_frame`), so the groomed W mass falls 12 GeV below the `shower` level, and 18-19 % of
+the W systems are too heavy to be reshuffled at all. The restored W are often distorted far beyond a small correction
+(3000 W jets): the scale factor $k$ has the median 0.715, 20 % of the W have $k < 0.5$ and the smallest is 0.019, so the
+two prongs are pushed onto each other (their opening angle shrinks by a median factor 0.74, by 0.13 for 1 % of the W);
+single hadrons change their energy by factors from 0.04 to 56, 18 % of them by more than 50 %, and 5 % of the hadrons
+move from more than 0.8 rad of the W axis to within it. With `singlet_frame`, $k$ lies between 0.81 and 1.006 and the
+hadron energies change by factors 0.80-1.23. The W peak then returns to the `shower` level and the reshuffle almost
+never fails (1 system in 10 000), but the W quarks then make a third fewer particles (the fragmentation was never tuned
+to e+e- multiplicities) and $\tau_{21}$ of the W falls by 0.03. QCD jets are never reshuffled: there the target would be
+the showered jet, which has no physical mass to restore (hadronisation does raise jet masses), the chains of 40 % of the
+QCD jets are already heavier together than the parton-level jet, and the toy QCD masses lie below JetClass (m_SD 19.4
+against 23.0 GeV) so that a reshuffle would move them further away.
+
+Neither switch can be calibrated with the knobs of the calibration (45 000 jets per point, `detector`,
+`jetclass_selection`). With `hadron_reshuffle` the W $m_\mathrm{SD}$ median stays between 66.1 and 66.8 GeV for
+`ue_density` 0.7-4, `pi0_fraction` 0.20-0.50, `neutral_fraction` 0.13-0.20 and `b_decay_multiplicity` 5-7, and the W
+window fraction between 0.52 and 0.54. The parameter that matters is `kt_sigma`, not one of these knobs (6000 W jets):
+with the reshuffle the W $m_\mathrm{SD}$ median is 66.3 GeV at 0.24 GeV (1049 failed steps), 70.4 GeV at 0.12 GeV (295)
+and 73.2 GeV at 0 (135), still below the 75 GeV of the original accepted range; without the reshuffle `kt_sigma` moves
+it by less than 1 GeV (81.5, 81.0, 80.7 GeV). With both switches the W multiplicity reaches 27 only at `ue_density` 2.5
+(27.4 particles; QCD jets 37.9, top window 0.82); `pi0_fraction` 0.45 adds 0.7 particles and raises the photon share of
+QCD jets from 0.40 to 0.52. Turning either switch on would therefore need a retune of the fragmentation parameters
+themselves, not only of the calibration knobs.
 
 ## Underlying event
 
@@ -751,13 +843,19 @@ easier than JetClass**:
 
 - **Sharper mass peaks.** 78 % of the toy W jets and 82 % of the toy top jets fall into the mass windows, against 68 %
   and 69 % in JetClass, and the peaks sit 3-4 % higher (81.6 and 169.8 GeV against 77.3 and 164.9). Independent
-  fragmentation conserves the energy of every chain but not its momentum: the hadrons are massive (and every
-  hadron has at least its mass plus 0.05 GeV of energy), so the momentum of a chain falls short of that of its parton
-  and the invariant mass of each resonance system rises. The soft-drop mass of the W goes from 79.8 GeV at the
-  `shower` level to 83.9 GeV at the `hadrons` level, and stays at 84.6 GeV with `kt_sigma` = 0, so the transverse
-  momenta of the hadrons play no part. The out-of-cone radiation, the neutrinos from charm decays and the realistic
-  detector of JetClass smear its peaks out, which the toy also does not do. The accepted ranges of
-  `msd_median_w`/`_top` and `msd_window_top` were widened for this (from 75-82, 156-170 and 0.62-0.80).
+  fragmentation conserves the energy of every chain but not its momentum: the hadrons are massive (and every hadron has
+  at least its mass plus 0.05 GeV of energy), so the momentum of a chain falls short of that of its parton and the
+  invariant mass of each resonance system rises. The soft-drop mass of the W goes from 79.8 GeV at the `shower` level to
+  83.9 GeV at the `hadrons` level, and stays at 84.6 GeV with `kt_sigma` = 0, so the transverse momenta of the hadrons
+  play no part in the groomed mass (they do in the total mass of the W hadrons and in the [hadron-level
+  reshuffle](#hadron-level-reshuffle)). The out-of-cone radiation, the neutrinos from charm decays and the realistic
+  detector of JetClass smear its peaks out, which the toy also does not do. The accepted ranges of `msd_median_w`/`_top`
+  and `msd_window_top` were widened for this (from 75-82, 156-170 and 0.62-0.80). The [hadron-level
+  reshuffle](#hadron-level-reshuffle) restores the resonance four-momentum but overcorrects (W $m_\mathrm{SD}$ 66 GeV);
+  only together with the W singlet frame does it put the peaks at 78.9 and 164.3 GeV, at the price of a third fewer
+  particles in W jets. None of the calibration knobs (`ue_density`, `pi0_fraction`, `neutral_fraction`,
+  `b_decay_multiplicity`) moves the W peak with the reshuffle by more than 0.5 GeV or brings the W multiplicity of the
+  singlet frame to 27 without spoiling QCD jets, so both switches stay off.
 - **W jets have more particles than QCD jets** (38.0 against 35.8; JetClass 32.2 against 35.3). Two independent
   300 GeV chains make more hadrons than one 600 GeV chain, where a string between the W quarks makes fewer; the
   multiplicity therefore separates W from QCD in the opposite direction in the toy (accepted range of `n_w` widened
@@ -795,8 +893,8 @@ jetgen generate --override wqq:pi0_fraction=0.50 -n 60000 --seed 72 -o data/t7_s
 ```
 
 (W jets with more photons from $\pi^0$ decays than the QCD and top jets). `jetgen generate --mystery` plants one of five
-hidden shortcuts, chosen from the seed, and stores it only in an encoded form in the provenance (`jetgen info
---reveal` prints it):
+hidden shortcuts, chosen from the seed, and stores it only scrambled in the provenance (`jetgen info --provenance`
+shows a placeholder, `jetgen info --reveal` prints it):
 
 | name          | process | option          | value  | what changes                                             | PFN gain |
 |---------------|---------|-----------------|--------|----------------------------------------------------------|----------|
@@ -813,9 +911,11 @@ loses 8-26 % of accuracy. `cell_grid` is the exception: the grid lives in absolu
 per-particle model on $\Delta\eta$, $\Delta\phi$ cannot see, and ParT-small did not use it either in 4 epochs; the
 data still differ, so a jet display or the cell positions modulo the cell size find it. The known shortcut above
 gives the PFN 2.2 % with `kinpid` features (particle-type flags) and almost nothing (0.2 %) with `kin`. The mapping
-from the seed to the shortcut is in the source code (`itj.toy.mystery`): reading it spoils T7.2. An instructor who
-wants a real hunt sets the environment variable `ITJ_MYSTERY_KEY` to a private number before generating the
-students' files.
+from the seed to the shortcut and the scrambling are in the source code (`itj.toy.mystery`): reading it spoils T7.2.
+An instructor who wants a real hunt sets the environment variable `ITJ_MYSTERY_KEY` to a private number before
+generating the students' files; both then depend on the key, and `--reveal` needs it too. The scrambling hides the
+answer from a glance, not from a determined reader, and the files themselves show the shortcut to anyone who compares
+the classes (counts per process in `jetgen info`, the truth columns): that comparison is part of the hunt.
 
 ## Reproducibility
 

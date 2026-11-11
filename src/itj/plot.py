@@ -968,7 +968,9 @@ def attribution_display(
 def efn_filters(model: Any, *, n: int = 8, extent: float = 0.8, bins: int = 64) -> Figure:
     """Draw the ``n`` most active EFN filters Phi_a(Delta eta, Delta phi) (from ``EFN.filters``).
 
-    The filters are ranked by their integral of ``|Phi_a|`` over the window.
+    The filters are ranked by their integral of ``|Phi_a|`` over the window. Every panel has its own colour bar
+    (signed values on a diverging map, non-negative ones on viridis); a filter that is constant over the window, for
+    example a ReLU unit that died in training, is marked "dead" in its title.
 
     Parameters
     ----------
@@ -1000,7 +1002,7 @@ def efn_filters(model: Any, *, n: int = 8, extent: float = 0.8, bins: int = 64) 
         f = filters[k]
         signed = bool(np.any(f < 0))
         vmax = float(np.max(np.abs(f))) or 1.0
-        ax.imshow(
+        image = ax.imshow(
             f.T,
             origin="lower",
             extent=(-extent, extent, -extent, extent),
@@ -1009,7 +1011,9 @@ def efn_filters(model: Any, *, n: int = 8, extent: float = 0.8, bins: int = 64) 
             vmax=vmax,
             interpolation="nearest",
         )
-        ax.set_title(f"filter {k}", fontsize="small")
+        fig.colorbar(image, ax=ax, shrink=0.8, label=r"$\Phi_a$" + (" (signed)" if signed else ""))
+        dead = float(np.ptp(f)) <= 1e-6 * max(vmax, 1e-12)
+        ax.set_title(f"filter {k}" + (" (dead: constant)" if dead else ""), fontsize="small")
         ax.set_aspect("equal")
         ax.set_xlabel(_XLABEL)
         ax.set_ylabel(_YLABEL)

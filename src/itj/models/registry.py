@@ -143,6 +143,11 @@ def save_model(model: Tagger, path: str | os.PathLike[str], *, extra: dict[str, 
     pathlib.Path
         The path written. The file holds ``{"itj_version", "name", "config", "state_dict", "extra"}``.
     """
+    if not isinstance(model, Tagger):
+        raise TypeError(
+            f"save_model saves an itj Tagger, not a {type(model).__name__}: copy the weights of your own model into "
+            "build_model(...) with load_state_dict (the key map of T2.4) and save that, or use torch.save"
+        )
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     state = {k: v.detach().cpu() for k, v in model.state_dict().items()}

@@ -58,6 +58,9 @@ _B0 = (33.0 - 2.0 * 5) / (12.0 * math.pi)
 #: Emission channels (``truth_emis_channel``).
 CHANNELS: tuple[str, ...] = ("q -> q g", "g -> g g", "g -> q qbar")
 
+#: A system of one particle lighter than this fraction of its energy counts as massless in :func:`reshuffle`.
+_MASSLESS = 1e-6
+
 #: Attempts to shower a resonance again when its shower systems are heavier than the resonance.
 _MAX_RESHOWER = 100
 
@@ -390,6 +393,9 @@ def _emissions_to_record(emissions: list[tuple[np.ndarray, ...]]) -> EmissionRec
 def reshuffle(q: np.ndarray, p4: np.ndarray, system: np.ndarray, mass_res: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Give each shower system of a resonance its decay momentum, rescaled so that four-momentum is conserved.
 
+    The hadron-level reshuffle (:func:`itj.toy.hadronize.reshuffle_hadrons`) calls it with the hadron systems and
+    the parton-level system momenta.
+
     The Herwig recipe with the decay momenta of the hard process (``docs/physics.md#resonance-reshuffle``), in the
     resonance rest frame:
 
@@ -397,16 +403,16 @@ def reshuffle(q: np.ndarray, p4: np.ndarray, system: np.ndarray, mass_res: np.nd
     2. ``m_i`` = invariant mass of shower system i;
     3. solve ``sum_i sqrt(k^2 |q_i|^2 + m_i^2) = M`` for k (Newton from above: the function is convex);
     4. move each system to ``(sqrt(k^2 |q_i|^2 + m_i^2), k q_i)``: boost to its rest frame, then by
-       ``k q_i / E_i'``; a single massless parton is set directly to ``(k q_i, k |q_i|)``.
+       ``k q_i / E_i'``; a single massless particle is set directly to ``(k q_i, k |q_i|)``.
 
     Parameters
     ----------
     q : numpy.ndarray
         ``(r, s, 3)`` decay momenta of the ``s`` systems of ``r`` resonances in their rest frames.
     p4 : numpy.ndarray
-        ``(m, 4)`` partons in the rest frame of their resonance.
+        ``(m, 4)`` partons (or hadrons) in the rest frame of their resonance.
     system : numpy.ndarray
-        ``(m,)`` int, ``resonance * s + system index`` of every parton.
+        ``(m,)`` int, ``resonance * s + system index`` of every parton (or hadron).
     mass_res : numpy.ndarray
         ``(r,)`` resonance masses.
 
@@ -418,10 +424,11 @@ def reshuffle(q: np.ndarray, p4: np.ndarray, system: np.ndarray, mass_res: np.nd
     """
     r, s, _ = q.shape
     q = q - q.sum(axis=1, keepdims=True) / s
-    total = np.zeros((r * s, 4))
-    np.add.at(total, system, p4)
+    total = np.stack([np.bincount(system, weights=p4[:, c], minlength=r * s) for c in range(4)], axis=1)
     count = np.bincount(system, minlength=r * s)
-    m_sys = np.where(count > 1, mass(total), 0.0).reshape(r, s)
+    m_all = mass(total)
+    # a single massless particle has the mass 0 (not the rounding error); a single hadron keeps its mass
+    m_sys = np.where((count > 1) | (m_all > _MASSLESS * total[:, 3]), m_all, 0.0).reshape(r, s)
     qn = np.linalg.norm(q, axis=2)
     big_m = np.asarray(mass_res, dtype=np.float64)
     ok = m_sys.sum(axis=1) < big_m

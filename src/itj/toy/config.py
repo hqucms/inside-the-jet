@@ -277,10 +277,23 @@ class HadronPart(_Part):
     Every final parton starts a chain: per rank the species is drawn first (pi0 with ``pi0_fraction``, a neutral
     hadron with ``neutral_fraction``, else a charged hadron), then ``z`` from ``f(z) = (1 - a) + 3 a (1 - z)^2``;
     the hadron takes ``max(z E_rem, e_min_hadron, m + 0.05 GeV)``; the chain stops when ``E_rem < 2 e_stop``.
-    Transverse momenta ``k ~ N(0, kt_sigma^2)`` per break and component are compensated within the chain.
+    Transverse momenta ``k ~ N(0, kt_sigma^2)`` per break and component are compensated within the chain. With
+    ``singlet_frame`` the quarks of every W fragment in the W rest frame; with ``hadron_reshuffle`` the hadrons of
+    every W and top are then moved back to the parton-level four-momentum of the resonance (both off by default,
+    ``docs/physics.md#hadron-level-reshuffle``).
     """
 
     hadronize: bool = _param(True, "hadronisation (off: the partons are the particles)")
+    singlet_frame: bool = _param(
+        False,
+        "fragment the quarks of every W (also in a top) in the W rest frame (experimental, not calibrated: a third "
+        "fewer particles in W jets; see physics.md#hadron-level-reshuffle)",
+    )
+    hadron_reshuffle: bool = _param(
+        False,
+        "restore the four-momentum of W and top after hadronisation (experimental, not calibrated: W m_SD 66 GeV, "
+        "about one W in five cannot be restored; see physics.md#hadron-level-reshuffle)",
+    )
     ff_a: float = _param(0.77, "Field-Feynman parameter a of f(z) = (1 - a) + 3 a (1 - z)^2")
     kt_sigma: float = _param(0.24, "Gaussian width of the transverse momentum per break and component", "GeV")
     e_stop: float = _param(1.5, "a chain stops when the remaining energy is below 2 e_stop", "GeV")
@@ -568,7 +581,8 @@ class SimConfig:
         )
         hadron = (
             f"Field-Feynman a = {a.ff_a:g}, kt_sigma {a.kt_sigma:g} GeV, e_stop {a.e_stop:g} GeV, e_min "
-            f"{a.e_min_hadron:g} GeV; pi0 {a.pi0_fraction:g}, neutral {a.neutral_fraction:g}"
+            f"{a.e_min_hadron:g} GeV; pi0 {a.pi0_fraction:g}, neutral {a.neutral_fraction:g}; W singlet frame "
+            f"{_on(a.singlet_frame)}, hadron reshuffle {_on(a.hadron_reshuffle)}"
             if a.hadronize
             else "off"
         )

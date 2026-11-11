@@ -74,6 +74,7 @@ git clone https://github.com/hqucms/inside-the-jet.git
 cd inside-the-jet
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu   # Linux without a GPU: the small CPU build
 python -m pip install -e ".[analysis,dev]"
 python -m pytest                                 # fast tests (the "deselected" ones are the slow tests)
 python -m ipykernel install --user --name inside-the-jet --display-name "Python (inside-the-jet)"
@@ -82,8 +83,9 @@ python -m ipykernel install --user --name inside-the-jet --display-name "Python 
 The last line registers the environment as the Jupyter kernel `Python (inside-the-jet)` that the notebooks use.
 `python -m pip install -e ".[weaver]"` adds weaver, the training framework of ParT (Python 3.10 to 3.13; only task T4.6
 needs it). The environment takes about 2 GB; the task data about 1.0 GB (week 1) and 1.9 GB (week 2, downloads
-included): keep about 6 GB free. Windows, a smaller CPU-only PyTorch, GPUs and Colab, Apple Silicon, `uv`, clusters and
-common problems: [docs/install.md](docs/install.md).
+included): keep about 6 GB free. Plan on 16 GB of memory: the two ParT-small trainings of T2.4 peak at about 9 and 4 GB
+(13 GB together), a weaver run at 6-7 GB; with 8 GB run them one at a time. Windows, a smaller CPU-only PyTorch, GPUs
+and Colab, Apple Silicon, `uv`, clusters and common problems: [docs/install.md](docs/install.md).
 
 ## Quick start
 

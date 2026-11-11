@@ -197,10 +197,16 @@ def test_efn_filters() -> None:
         def filters(self, *, extent: float = 0.8, bins: int = 64) -> np.ndarray:
             g = np.linspace(-extent, extent, bins)
             r = np.hypot(*np.meshgrid(g, g, indexing="ij"))
-            return np.stack([np.exp(-((r - c) ** 2) / 0.01) for c in np.linspace(0, 0.6, 10)])
+            rings = [np.exp(-((r - c) ** 2) / 0.01) for c in np.linspace(0, 0.6, 10)]
+            return np.stack([*rings, np.zeros_like(r)])  # the last one died
 
     fig = plot.efn_filters(FakeEFN(), n=6)
-    assert sum(ax.get_visible() for ax in fig.axes) == 6
+    panels = [ax for ax in fig.axes if ax.get_visible() and ax.get_title().startswith("filter")]
+    assert len(panels) == 6
+    assert len(fig.axes) - sum(not ax.get_visible() for ax in fig.axes) == 12  # one colour bar per panel
+    titles = [ax.get_title() for ax in plot.efn_filters(FakeEFN(), n=11).axes]
+    assert "filter 10 (dead: constant)" in titles
+    assert sum("dead" in t for t in titles) == 1
 
 
 def test_cka_heatmap() -> None:

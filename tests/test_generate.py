@@ -47,11 +47,46 @@ def test_identities_on_fixtures(toy_small, qg_small):
         {"jet_def": "cone"},
         {"cell_position": "centre", "alphas_mode": "fixed", "alphas_value": 0.12},
         {"w_helicity": False, "dead_cone": True, "g_to_qq": False},
+        {"hadron_reshuffle": True},
+        {"hadron_reshuffle": True, "singlet_frame": True, "ue": False},
     ],
 )
 def test_identities_on_modified_configurations(overrides):
     data = generate(150, config=preset("detector", **overrides), processes=("q", "g", "wqq", "tbqq"), seed=2)
-    _all_true(check_identities(data))
+    checks = check_identities(data)
+    _all_true(checks)
+    assert ("hadron_sum" in checks) == bool(overrides.get("hadron_reshuffle"))
+
+
+def test_hadron_reshuffle_identity_and_pairing():
+    config = preset("detector", hadron_reshuffle=True, singlet_frame=True)
+    data = generate(1200, config=config, processes=("qcd", "wqq", "tbqq"), seed=4, workers=2)
+    record = data.provenance["hadron_reshuffle"]
+    names = data.process_names
+    assert record["steps"] == np.sum(names == "wqq") + 2 * np.sum(names == "tbqq")  # W; W in the top and the top
+    assert record["failed"] <= 2  # about 1 in 10 000 W and top systems is too heavy in the singlet frame
+    assert 0 <= record["failed_w_in_top"] <= record["failed"]
+    assert check_identities(data)["hadron_sum"]
+    broken = JetData(data.columns, config=data.config, provenance={**data.provenance, "hadron_reshuffle": {
+        "steps": 1, "failed": 0, "max_residual": 1e-3}})  # fmt: skip
+    assert not check_identities(broken)["hadron_sum"]
+    # the output does not depend on the workers; the hard process and the shower stay paired with the default
+    _equal(data, generate(1200, config=config, processes=("qcd", "wqq", "tbqq"), seed=4, workers=1))
+    default = generate(1200, processes=("qcd", "wqq", "tbqq"), seed=4)
+    _equal(default, data, ["truth_seed_pt", "truth_mass", "truth_parton_px", "truth_emis_theta"])
+    qcd = np.flatnonzero(names == "qcd")
+    _equal(default.select(qcd), data.select(qcd))  # QCD jets are untouched
+    assert not np.array_equal(default["part_px"].values, data["part_px"].values)
+
+
+def test_hadron_sum_with_a_per_process_override():
+    """The identity applies whenever the reshuffle ran, also for one process only (the global switch is off)."""
+    overrides = {"wqq": {"hadron_reshuffle": True}}
+    data = generate(300, processes=("qcd", "wqq", "tbqq"), process_overrides=overrides, seed=3)
+    record = data.provenance["hadron_reshuffle"]
+    assert record["steps"] == np.sum(data.process_names == "wqq")
+    assert record["failed_w_in_top"] == 0
+    assert check_identities(data)["hadron_sum"]
 
 
 def test_columns_and_labels(toy_small):
@@ -121,8 +156,9 @@ def test_pairing_across_presets(ladder_small):
     assert len(ladder_small["partons"]["truth_emis_theta"].values) == 0
 
 
-def test_jet_origin_tracks_identical_without_ue_and_with_cell_centres():
-    base = preset("detector", jet_def="cone")
+@pytest.mark.parametrize("extra", [{}, {"hadron_reshuffle": True, "singlet_frame": True}])
+def test_jet_origin_tracks_identical_without_ue_and_with_cell_centres(extra):
+    base = preset("detector", jet_def="cone", **extra)
     runs = [generate(300, config=base.replace(**o), seed=9) for o in ({}, {"ue": False}, {"cell_position": "centre"})]
 
     def tracks(data):
@@ -178,6 +214,7 @@ def test_provenance():
         "command_line",
         "stage_times_s",
         "hadron_kt_capped",
+        "hadron_reshuffle",
     ):
         assert key in p, key
     assert set(p["stage_times_s"]) == set(STAGES)
@@ -186,6 +223,7 @@ def test_provenance():
     assert p["processes"] == ["wqq", "tbqq"]
     assert 0.85 < p["containment_efficiency"]["wqq"] <= 1.0
     assert 0.0 <= p["hadron_kt_capped"] < 0.3
+    assert p["hadron_reshuffle"] == {"steps": 0, "failed": 0, "failed_w_in_top": 0, "max_residual": 0.0}  # off
     np.testing.assert_array_equal(data["truth_event_id"], 500 + np.arange(120))
     modified = generate(30, config=preset("shower", kt_cut=2.0), seed=1)
     assert modified.provenance["preset"] == "shower"

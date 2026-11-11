@@ -75,6 +75,7 @@ def test_train_tagger(tmp_toy_file, tmp_path, capsys):
     assert rows[0]["n_train"] == "210"
     assert rows[0]["note"] == "tiny"
     assert 0 <= float(rows[0]["auc_w"]) <= 1
+    assert 0 <= float(rows[0]["auc_w_err"]) < 0.5  # the bootstrap error
 
 
 def test_train_tagger_mlp_and_qg(tmp_path):

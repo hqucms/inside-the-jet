@@ -324,7 +324,7 @@ def _simulate_group(
     seed: int,
     event_ids: np.ndarray,
     times: dict[str, float],
-    stats: dict[str, int],
+    stats: dict[str, float],
 ) -> tuple[JetData, np.ndarray, HardEvents]:
     """Simulate ``n`` events of one process with its four streams; returns the jets, the pass mask, the hard events."""
     rng_hard, rng_shower, rng_hadron, rng_ue = rngs
@@ -385,7 +385,7 @@ class _Task:
 class _ChunkResult:
     data: JetData
     times: dict[str, float]
-    stats: dict[str, int]
+    stats: dict[str, float]
     tested: dict[str, int]
     contained: dict[str, int]
 
@@ -406,7 +406,7 @@ def _simulate_chunk(task: _Task) -> _ChunkResult:
     labels = np.repeat(codes, balanced_counts(task.size, len(codes)))
     process_at = labels[rng_chunk.permutation(task.size)]
     times: dict[str, float] = {}
-    stats: dict[str, int] = {}
+    stats: dict[str, float] = {}
     tested: dict[str, int] = {}
     contained: dict[str, int] = {}
     parts: list[JetData] = []
@@ -494,7 +494,8 @@ def _provenance(
     times = dict.fromkeys(STAGES, 0.0)
     tested: dict[str, int] = {}
     contained: dict[str, int] = {}
-    hadrons = capped = 0
+    hadrons = capped = reshuffles = reshuffle_failed = failed_w_in_top = 0.0
+    residual = 0.0
     for r in results:
         for key, value in r.times.items():
             times[key] = times.get(key, 0.0) + value
@@ -504,6 +505,10 @@ def _provenance(
             contained[key] = contained.get(key, 0) + value
         hadrons += r.stats.get("hadrons", 0)
         capped += r.stats.get("hadrons_capped", 0)
+        reshuffles += r.stats.get("hadron_reshuffles", 0)
+        reshuffle_failed += r.stats.get("hadron_reshuffle_failed", 0)
+        failed_w_in_top += r.stats.get("hadron_reshuffle_failed_w_in_top", 0)
+        residual = max(residual, r.stats.get("hadron_reshuffle_residual", 0.0))
     return {
         "seed": seed,
         "first_event_id": first_event_id,
@@ -525,6 +530,12 @@ def _provenance(
         "command_line": None,
         "stage_times_s": {key: round(value, 4) for key, value in times.items()},
         "hadron_kt_capped": capped / hadrons if hadrons else 0.0,
+        "hadron_reshuffle": {
+            "steps": int(reshuffles),
+            "failed": int(reshuffle_failed),
+            "failed_w_in_top": int(failed_w_in_top),
+            "max_residual": residual,
+        },
     }
 
 

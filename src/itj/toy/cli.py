@@ -611,7 +611,9 @@ def _info(args: argparse.Namespace) -> None:
         if provenance is None:
             print("no provenance (not a toy file)")
         else:
-            print(json.dumps(provenance, indent=2, sort_keys=False, default=str))
+            from .mystery import hide
+
+            print(json.dumps(hide(provenance), indent=2, sort_keys=False, default=str))
     if args.reveal:
         from .mystery import reveal
 
