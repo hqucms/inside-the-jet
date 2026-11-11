@@ -490,7 +490,7 @@ def cluster(
 
     for start in range(0, n_jets, bucket_size):
         idx = order[start : start + bucket_size]
-        n = int(length[idx].max()) if len(idx) else 0
+        n = int(np.max(length[idx])) if len(idx) else 0
         if n == 0:
             continue
         res = _cluster_block(p4[idx, :n], mask[idx, :n], p, float(R), recombination == "WTA", inclusive)

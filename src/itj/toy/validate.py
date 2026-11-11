@@ -312,7 +312,7 @@ _FLAGS = ("part_isChargedHadron", "part_isNeutralHadron", "part_isPhoton", "part
 
 def _check_flags(data: JetData) -> bool:
     _need(data, *_FLAGS)
-    total = np.sum([np.asarray(data[f].values, dtype=np.int64) for f in _FLAGS], axis=0)  # type: ignore[union-attr]
+    total = np.stack([np.asarray(data[f].values, dtype=np.int64) for f in _FLAGS]).sum(axis=0)  # type: ignore[union-attr]
     hadronize = _switch(data.config, "hadron", "hadronize")
     if hadronize is None:
         return bool(np.all((total == 0) | (total == 1)))

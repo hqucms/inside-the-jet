@@ -346,7 +346,7 @@ def _row_selection(rows: ArrayLike, n: int) -> np.ndarray:
     if not np.issubdtype(index.dtype, np.integer):
         raise TypeError(f"rows must be a boolean mask or an integer index array, got dtype {index.dtype}")
     index = index.astype(np.int64).reshape(-1)
-    if index.size and (index.min() < -n or index.max() >= n):
+    if index.size and (np.min(index) < -n or np.max(index) >= n):
         raise IndexError(f"row index out of range for {n} rows")
     return np.where(index < 0, index + n, index)
 
@@ -510,7 +510,7 @@ class Ragged:
     def from_counts(values: ArrayLike, counts: ArrayLike) -> Ragged:
         """Build a ragged array from flat values and the number of values in every row."""
         counts = np.asarray(counts, dtype=np.int64).reshape(-1)
-        if counts.size and counts.min() < 0:
+        if counts.size and np.min(counts) < 0:
             raise ValueError("counts must be >= 0")
         offsets = np.zeros(len(counts) + 1, dtype=np.int64)
         np.cumsum(counts, out=offsets[1:])

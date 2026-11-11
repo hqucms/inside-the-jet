@@ -84,7 +84,7 @@ def _padded(p4: np.ndarray, event: np.ndarray, n: int) -> tuple[np.ndarray, np.n
     """Pad particles sorted by event to ``(n, N, 4)``; returns the array, the mask and each particle's slot."""
     counts = np.bincount(event, minlength=n)
     slot = np.arange(len(event)) - np.repeat(_offsets(counts)[:-1], counts)
-    width = max(int(counts.max()) if n else 0, 1)
+    width = max(int(np.max(counts)) if n else 0, 1)
     out = np.zeros((n, width, 4))
     out[event, slot] = p4
     mask = np.zeros((n, width), dtype=bool)

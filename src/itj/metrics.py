@@ -220,7 +220,7 @@ def confusion(probs: np.ndarray, labels: np.ndarray, n_classes: int) -> np.ndarr
     if p.ndim != 2 or p.shape[0] != lab.shape[0]:
         raise ValueError(f"probs must be (N, C) with N = len(labels) = {lab.shape[0]}, got {p.shape}")
     pred = np.argmax(p, axis=1).astype(np.int64)
-    if lab.size and (lab.min() < 0 or lab.max() >= n_classes or pred.max() >= n_classes):
+    if lab.size and (np.min(lab) < 0 or np.max(lab) >= n_classes or np.max(pred) >= n_classes):
         raise ValueError(f"classes must be in [0, {n_classes})")
     out = np.zeros((n_classes, n_classes), dtype=np.int64)
     np.add.at(out, (lab, pred), 1)

@@ -639,7 +639,7 @@ def jet_image(
     ax = _new_axes(ax)
     positive = image[image > 0]
     norm = (
-        LogNorm(vmin=max(float(positive.min()), float(positive.max()) * 1e-5), vmax=float(positive.max()))
+        LogNorm(vmin=max(float(np.min(positive)), float(np.max(positive)) * 1e-5), vmax=float(np.max(positive)))
         if (log and positive.size)
         else None
     )

@@ -29,7 +29,9 @@ def test_help_lists_every_config_flag_and_group(capsys):
         assert f"{title} options" in text
     assert "(on in: hadrons, detector)" in " ".join(text.split())
     assert "(detector: 0.77)" in text
-    for flag in ("-n N, --n-jets N", "--override", "--mystery", "--workers", "--first-event-id", "--no-truth"):
+    # Python >= 3.13 prints the metavar once ("-n, --n-jets N"), older versions twice ("-n N, --n-jets N")
+    assert "-n N, --n-jets N" in text or "-n, --n-jets N" in text
+    for flag in ("--override", "--mystery", "--workers", "--first-event-id", "--no-truth"):
         assert flag in text
     top = _help(capsys)
     assert TOY_NAME in " ".join(top.split())

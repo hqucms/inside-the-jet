@@ -240,7 +240,7 @@ def test_files_and_load_jetclass(tmp_path):
 
     with pytest.raises(FileNotFoundError, match="jetgen fetch jetclass --split val --classes QCD,Wqq,Tbqq"):
         files("val", root=tmp_path / "nothing")
-    with pytest.raises(FileNotFoundError, match=f"--dest {tmp_path / 'nothing'}"):
+    with pytest.raises(FileNotFoundError, match=re.escape(f"--dest {tmp_path / 'nothing'}")):
         files("val", root=tmp_path / "nothing")
     with pytest.raises(FileNotFoundError, match=r"fetch jetclass --split example --dest"):
         files("example", root=tmp_path / "nothing")
