@@ -1,0 +1,57 @@
+# Data and models
+/data/
+/models/
+/runs/
+*.parquet
+*.parquet.part
+*.root
+*.pt
+*.pth
+predict_output/
+*.auto.yaml
+lightning_logs/
+!tests/data/*.parquet
+!tests/data/*.npz
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.python-version
+
+# Tests, coverage and type checking
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs and cluster job output
+logs/
+*.log
+*.out
+*.err
+slurm-*.out
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db

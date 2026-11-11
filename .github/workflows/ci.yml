@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  CUDA_VISIBLE_DEVICES: ""
+
+jobs:
+  lint:
+    name: Lint and types
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install (CPU-only PyTorch)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[analysis,dev]"
+      - name: Ruff (lint)
+        run: ruff check --output-format=github .
+      - name: Ruff (format)
+        run: ruff format --check --diff .
+      - name: Mypy
+        run: mypy
+      - name: Pre-commit hooks
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  test:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: macos-latest
+            python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.12"
+    defaults:
+      run:
+        shell: bash
+    env:
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install (CPU-only PyTorch)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[analysis,dev]"
+      - name: Versions
+        run: python -c "import numpy, pyarrow, torch; print('numpy', numpy.__version__, '| pyarrow', pyarrow.__version__, '| torch', torch.__version__)"
+      - name: Tests
+        run: pytest --cov --cov-report=term
+      - name: Slow tests
+        run: pytest -m slow
+
+  extras:
+    name: Extras (weaver, fastjet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install (CPU-only PyTorch)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[analysis,dev,ml,weaver]" fastjet
+      - name: Versions
+        run: python -c "import numpy, pyarrow, torch, weaver, fastjet; print('numpy', numpy.__version__, '| pyarrow', pyarrow.__version__, '| torch', torch.__version__, '| fastjet', fastjet.__version__)"
+      - name: Weaver tests
+        run: pytest -m weaver
+      - name: Clustering against fastjet
+        run: pytest tests/test_cluster.py
+      - name: Toy file split for weaver
+        run: |
+          jetgen generate -n 8000 --seed 1 --workers auto --no-progress -o smoke/toy.parquet
+          jetgen split smoke/toy.parquet --out-dir smoke/split
+      # --fetch-step 1: weaver 0.5.4 fails on a partial load range of a Parquet file ("could not broadcast input
+      # array" in _fused_pad_and_stack), so every file is read whole.
+      - name: Weaver smoke run (30 CPU steps)
+        run: >-
+          weaver --data-train 'toy:smoke/split/train/toy.parquet' --data-val smoke/split/val/toy.parquet
+          --data-test 'toy:smoke/split/test/toy.parquet' --data-config src/itj/configs/jets3_kin.yaml
+          --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3
+          -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4
+          --model-prefix smoke/run/net --gpus '' --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1
+          --steps-per-epoch 30 --in-memory --fetch-step 1 --predict-output smoke/pred.parquet
+      - name: Weaver predictions
+        run: python -c "import pyarrow.parquet as pq; t = pq.read_table('smoke/pred_toy.parquet'); print(t.num_rows, 'jets predicted'); assert t.num_rows == 1600"

@@ -1,0 +1,13 @@
+# LF in the repository and in every checkout (also on Windows); binary files are left alone.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.pdf binary
+*.parquet binary
+*.root binary
+*.pt binary
+*.pth binary
+*.onnx binary
+*.npz binary
+*.h5 binary

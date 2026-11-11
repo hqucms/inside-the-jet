@@ -1,0 +1,73 @@
+# Three classes (QCD, W -> qq', t -> bqq') with the kinematic and particle-identification features of the ParT paper.
+# Runs unchanged on the toy files and on the JetClass files. Split them first with `jetgen split` and pass the
+# train/val/test files with --data-train/--data-val/--data-test (one named group per file). There is no selection:
+# weaver applies it after concatenating the files of a fetch, so an index-based split would mix the files.
+
+new_variables:
+   part_mask: ak.ones_like(part_energy)
+   part_pt: np.hypot(part_px, part_py)
+   part_pt_log: np.log(part_pt)
+   part_e_log: np.log(part_energy)
+   part_logptrel: np.log(part_pt/jet_pt)
+   part_logerel: np.log(part_energy/jet_energy)
+   part_deltaR: np.hypot(part_deta, part_dphi)
+
+preprocess:
+   method: manual
+   data_fraction: 0.5
+
+inputs:
+   pf_points:
+      length: 128
+      pad_mode: wrap
+      vars:
+         - [part_deta, null]
+         - [part_dphi, null]
+   pf_features:
+      length: 128
+      pad_mode: wrap
+      vars:
+         - [part_pt_log, 1.7, 0.7]
+         - [part_e_log, 2.0, 0.7]
+         - [part_logptrel, -4.7, 0.7]
+         - [part_logerel, -4.7, 0.7]
+         - [part_deltaR, 0.2, 4.0]
+         - [part_charge, null]
+         - [part_isChargedHadron, null]
+         - [part_isNeutralHadron, null]
+         - [part_isPhoton, null]
+         - [part_isElectron, null]
+         - [part_isMuon, null]
+         - [part_deta, null]
+         - [part_dphi, null]
+   pf_vectors:
+      length: 128
+      pad_mode: wrap
+      vars:
+         - [part_px, null]
+         - [part_py, null]
+         - [part_pz, null]
+         - [part_energy, null]
+   pf_mask:
+      length: 128
+      pad_mode: constant
+      vars:
+         - [part_mask, null]
+
+labels:
+   type: simple
+   value: [label_QCD, label_Wqq, label_Tbqq]
+
+observers:
+   - jet_pt
+   - jet_eta
+   - jet_phi
+   - jet_energy
+   - jet_nparticles
+   - jet_sdmass
+   - jet_tau1
+   - jet_tau2
+   - jet_tau3
+   - jet_tau4
+
+weights:

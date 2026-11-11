@@ -1,0 +1,51 @@
+cff-version: 1.2.0
+message: "If you use this software in teaching or research, please cite it as below."
+type: software
+title: "itj: a jet toy for learning representations and interpretability of jet taggers"
+abstract: >-
+  A jet toy simulated from first principles ("A Spray of Hadrons"): QCD, W and top jets from a hard process, a
+  coherent parton shower, hadronisation, the underlying event and a simple detector, written with the branches of
+  the JetClass data set and a full truth record; tools that run the same analysis on the toy and on JetClass
+  (clustering, substructure observables, network inputs identical to weaver, ParticleNet and the Particle
+  Transformer with pretrained JetClass weights, probes, attributions and self-supervised learning) and student
+  tasks on representation learning and interpretability of jet taggers.
+authors:
+  - name: "<AUTHOR>"
+    affiliation: "<AFFILIATION>"
+version: 0.1.0
+date-released: 2026-11-05
+license: MIT
+repository-code: "https://github.com/hqucms/inside-the-jet"
+url: "https://github.com/hqucms/inside-the-jet"
+keywords:
+  - jet tagging
+  - jet substructure
+  - representation learning
+  - interpretability
+  - self-supervised learning
+  - particle physics
+  - teaching
+references:
+  - type: dataset
+    title: "JetClass: a large-scale dataset for deep learning in jet physics"
+    authors:
+      - family-names: Qu
+        given-names: Huilin
+      - family-names: Li
+        given-names: Congqiao
+      - family-names: Qian
+        given-names: Sitian
+    doi: 10.5281/zenodo.6619768
+    license: CC-BY-4.0
+  - type: article
+    title: "Particle Transformer for Jet Tagging"
+    authors:
+      - family-names: Qu
+        given-names: Huilin
+      - family-names: Li
+        given-names: Congqiao
+      - family-names: Qian
+        given-names: Sitian
+    journal: "Proceedings of the 39th International Conference on Machine Learning"
+    year: 2022
+    url: "https://arxiv.org/abs/2202.03772"
