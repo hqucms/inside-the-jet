@@ -305,6 +305,13 @@ def test_ablation_contexts_restore_the_model(jets: JetData) -> None:
 def test_irc_scan_shapes_and_efn_safety(jetclass_sample: JetData) -> None:
     torch.manual_seed(0)
     efn = build_model("efn")
+    # larger random weights: the freshly initialised EFN is nearly flat, so its responses would sit at the float32
+    # rounding level (about 1e-9) and their order would depend on the platform
+    with torch.no_grad():
+        for module in efn.modules():
+            if isinstance(module, torch.nn.Linear):
+                module.weight.normal_(0.0, 0.3)
+                module.bias.zero_()
     eps = [1e-2, 1e-3, 1e-4]
     soft = interpret.irc_scan(efn, jetclass_sample, mode="soft", values=eps, n_jets=60)
     assert set(soft) == {"values", "mean_abs_dscore", "std_abs_dscore", "mean_abs_dlogit"}
