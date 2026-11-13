@@ -7,10 +7,20 @@ import numpy as np
 import pytest
 
 import itj.toy
+from itj.data import JetData
 from itj.io import describe, load, read_metadata
 from itj.toy import generate, preset
 from itj.toy.cli import main
-from itj.toy.mystery import HIDDEN, SHORTCUTS, decode, encode, hide, mystery_overrides, reveal
+from itj.toy.mystery import (
+    HIDDEN,
+    RUN_STATISTICS,
+    SHORTCUTS,
+    decode,
+    encode,
+    hide,
+    mystery_overrides,
+    reveal,
+)
 
 
 def test_shortcuts_are_valid_overrides():
@@ -54,7 +64,7 @@ def test_encode_decode(monkeypatch):
     for name, process, field, _ in SHORTCUTS:
         for word in (name, process, field):
             assert word.encode() not in raw
-    # files of 0.1.0 (plain base64 of JSON) still decode
+    # files written before the scrambling (plain base64 of JSON) still decode
     legacy = base64.b64encode(json.dumps(payload).encode()).decode()
     assert decode(legacy) == payload
     # an instructor's key scrambles differently and is needed to reveal
@@ -116,3 +126,28 @@ def test_mystery_file_differs_from_a_clean_file_in_one_process(tmp_path, monkeyp
 def test_reveal_of_a_clean_file(tmp_toy_file, toy_small):
     assert reveal(tmp_toy_file) == "this file has no planted shortcut"
     assert reveal(toy_small) == "this file has no planted shortcut"
+
+
+def test_visible_provenance_of_a_mystery_file_is_that_of_a_clean_file(tmp_path, monkeypatch):
+    """The run statistics that a shortcut changes (containment, capped kT, stage times) are scrambled too."""
+    monkeypatch.delenv("ITJ_MYSTERY_KEY", raising=False)
+    seed = 5  # hard_w: raises the W containment efficiency
+    assert mystery_overrides(seed) == {"wqq": {"pt_min": 650.0}}
+    clean_path, mystery_path = tmp_path / "clean.parquet", tmp_path / "mystery.parquet"
+    assert main(["generate", "-n", "120", "--seed", str(seed), "-o", str(clean_path), "-q"]) == 0
+    assert main(["generate", "--mystery", "-n", "120", "--seed", str(seed), "-o", str(mystery_path), "-q"]) == 0
+    clean = read_metadata(clean_path)["provenance"]
+    planted = read_metadata(mystery_path)["provenance"]
+    volatile = {"command_line", "created", "wall_time_s", "mystery", "process_overrides"}
+    for key in RUN_STATISTICS:
+        assert planted[key] == HIDDEN
+        assert clean[key] != HIDDEN
+    differ = {key for key in (set(clean) | set(planted)) - volatile if clean.get(key) != planted.get(key)}
+    assert differ == set(RUN_STATISTICS)
+    payload = decode(planted["mystery"])
+    assert set(payload["statistics"]) == set(RUN_STATISTICS)
+    assert payload["statistics"]["containment_efficiency"]["wqq"] != clean["containment_efficiency"]["wqq"]
+    assert payload["statistics"]["containment_efficiency"]["qcd"] == clean["containment_efficiency"]["qcd"]
+    assert "hidden run statistics" in reveal(mystery_path)
+    # the entry of an older file (no statistics) still reveals in one line
+    assert "\n" not in reveal(JetData({"jet_pt": np.ones(1, np.float32)}, provenance={"mystery": encode(seed)}))

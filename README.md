@@ -29,7 +29,7 @@ and to the Particle Transformer (ParT) trained on it. The repository `inside-the
 
 | stage | content                                                                                                   | status               |
 |-------|-----------------------------------------------------------------------------------------------------------|----------------------|
-| A     | **A Spray of Hadrons** and JetClass: jets, taggers, representations and interpretability, tasks T0-T7 ([TASKS.md](TASKS.md)) | this release (0.1.0) |
+| A     | **A Spray of Hadrons** and JetClass: jets, taggers, representations and interpretability, tasks T0-T7 ([TASKS.md](TASKS.md)) | this release (0.1.1) |
 | B     | Symmetry-aware taggers: Lorentz-equivariant networks (LorentzNet, PELICAN, L-GATr) on the toy and on JetClass | next                 |
 | C     | Pretraining at scale and foundation models for jets                                                       | later                |
 | D     | Research projects                                                                                         | later                |

@@ -164,7 +164,7 @@ optionally `get_loss`. `-o key value` (repeatable) passes keyword arguments, eva
 | `--model-prefix` | training: the prefix of the saved states (`_best_epoch_state.pt`); testing: the `.pt` file |
 | `--gpus ''` | run on the CPU (the default `'0'` asks for a GPU); on Apple Silicon weaver then picks MPS (set `PYTORCH_ENABLE_MPS_FALLBACK=1`) |
 | `--num-workers` | data-loading processes: at most the number of files in each named group; `0` works and is not slower on a CPU |
-| `--in-memory` | load and preprocess the data once: right for small subsets |
+| `--in-memory` | load and preprocess the data once: right for small subsets; weaver 0.5.4 stops at once without `--steps-per-epoch`; the validation (in memory as well by default) takes its length from it unless `--steps-per-epoch-val` is given |
 | `--fetch-step 1` | read each Parquet file in one piece; weaver 0.5.4 fails on a partial read of a Parquet file ("could not broadcast input array") with the default 0.01 |
 | `--batch-size`, `--start-lr`, `--num-epochs`, `--steps-per-epoch` | the training loop (the default optimiser is `ranger`) |
 | `--lr-scheduler none` | a constant learning rate; with `--num-epochs 1` the default `flat+decay` runs the whole epoch at 1 % of `--start-lr`, so a short run learns nothing |

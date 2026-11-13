@@ -119,7 +119,8 @@ weaver --data-train 'QCD:data/jetclass/train/ZJetsToNuNu_000.parquet' 'Wqq:data/
   --data-test 'QCD:data/jetclass/split/test/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/test/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/test/TTBar_120.parquet' \
   --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py \
   --model-prefix runs/weaver_part/net --gpus 0 --num-workers 1 --batch-size 512 --start-lr 1e-3 --num-epochs 20 \
-  --optimizer ranger --use-amp --in-memory --fetch-step 1 --predict-output pred.parquet --log-file logs/weaver_part_${SLURM_JOB_ID}.log
+  --steps-per-epoch 585 --steps-per-epoch-val 58 --optimizer ranger --use-amp --in-memory --fetch-step 1 \
+  --predict-output pred.parquet --log-file logs/weaver_part_${SLURM_JOB_ID}.log
 ```
 
 Submit with `mkdir -p logs && sbatch slurm_weaver.sh`. The checkpoints and the predictions go to `runs/weaver_part/`;

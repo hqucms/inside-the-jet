@@ -196,8 +196,9 @@ cluster, run them in a job or an interactive session, not on the login node
 
 Files made with the same seed share their hard processes jet by jet: the `t1_*` ladder holds the same events at every
 preset, and `t3_w80_noue`, `t3_w80_centre` and `t3_w80_nocoh` are `t3_w80` with one thing changed
-([physics.md](docs/physics.md#reproducibility)). Such paired samples are made for differences, not for pooling. A
-change of the hard process (for example `--w-mass`) gives an independent sample, even with the same seed.
+([physics.md](docs/physics.md#reproducibility); without coherence the whole shower is drawn again, so `t3_w80_nocoh`
+shares only the hard processes). Such paired samples are made for differences, not for pooling. A change of the hard
+process (for example `--w-mass`) gives an independent sample, even with the same seed.
 
 ```bash
 # T1.1, T1.3-T1.6: the physics ladder, 10 000 jets per process, the same events at every preset
@@ -306,13 +307,14 @@ there)? Use power counting[^power] to explain why $D_2 \gg 1$ for one-prong jets
 *Optional:* $D_2$ at $\beta = 2$; the other levels.
 
 **T1.6** IRC safety by hand. Data: 1000 jets of `data/t1_detector.parquet`. Perturb them with `itj.augment.add_soft`
-($\epsilon = 10^{-1}, \ldots, 10^{-6}$) and `itj.augment.split_collinear` ($\lambda = 0.5, 0.1$;
+($\epsilon = 10^{-1}, \ldots, 10^{-6}$) and `itj.augment.split_collinear` ($\lambda = 0.5, 0.2$;
 $\delta = 10^{-1}, \ldots, 10^{-5}$), both with `substructure=True`, and plot the mean relative change of $m$,
 $m_\mathrm{SD}$, $\tau_2$, $\tau_{21}$, $e_2$, $D_2$, $N$, $p_T^D$ and the leading fraction against $\epsilon$ and
 $\delta$. Classify each observable as safe, Sudakov safe or unsafe ([observables.md](docs/observables.md)). Why can a
 scan on single jets with many particles not tell an IRC-safe observable from a Sudakov-safe one (hint: which limit
 does IRC safety concern, and which one does the scan take)? *Optional:* a two-particle
-jet where $\tau_{21} = 0/0$. These curves are the template of T5.5.
+jet where $\tau_{21} = 0/0$; the scan of $m_\mathrm{SD}$ at $\lambda = 0.05$, below $z_\mathrm{cut} = 0.1$ (see the
+pitfalls of [observables.md](docs/observables.md)): find the jets that change. These curves are the template of T5.5.
 
 **T1.7** Your own proposal (about 30 minutes, with a figure). For example: the dead cone of b quarks
 (`--dead-cone`), the W decay angle (`truth_cos_theta_star`), pull and colour coherence (`--no-coherence`), the
@@ -333,7 +335,9 @@ peaks with their errors (T1.4).
   `@` (matmul) for $e_3$, not a three-operand `np.einsum` (much more memory and about 7 times slower).
 - `itj.augment` returns new `part_*` columns: call the observables again on the result.
 - In T1.6, leave out the jets with $O = 0$ before the perturbation (about 0.2 % have $m_\mathrm{SD} = 0$, which makes
-  the mean of $|\Delta O|/O$ infinite), or plot the median of $|\Delta O|/O$ as well.
+  the mean of $|\Delta O|/O$ infinite), or plot the median of $|\Delta O|/O$ as well. `split_collinear` returns its
+  pieces in float64 (`float64=False` stores them as float32, rounded piece by piece: a spurious mass of about 0.1 GeV
+  per piece of a hard particle).
 - `data.select(data.process_names == "wqq")` keeps the W jets.
 
 [^sudakov]: Take the soft limit of $P_{qq}(z) = C_F(1 + z^2)/(1 - z)$ and write $k_t \approx (1 - z)E\theta$. The
@@ -368,8 +372,9 @@ IRC-safe observables, and why could that be dangerous on real data (you will see
 
 **T2.3** An MLP and your first training loop (write your own). In plain PyTorch: standardise the 12 inputs of T2.2,
 train an MLP with mini-batches and AdamW, validate after each epoch, stop early, and plot the train and val loss.
-Compare it with the BDT on the same inputs: why can a BDT beat an MLP on 12 features? Less than a minute of CPU. From
-here on you may use `itj.train.fit` instead of your own loop.
+Compare it with the BDT on the same inputs: which wins here, and by how much? Why can a BDT often beat an MLP on a few
+tabular features, and what does an MLP need to match it? Less than a minute of CPU. From here on you may use
+`itj.train.fit` instead of your own loop.
 
 **T2.4** Deep Sets: PFN and EFN (write your own). **First** start the two transformer trainings of T2.5 in a second
 terminal; each uses half of the cores and takes about 20-25 minutes when both run (12 and 9 minutes alone on six
@@ -403,11 +408,13 @@ the training and inference speeds in jets per second. Read [models.md](docs/mode
 
 **T2.6** How much data? The AUC (W against QCD) against the training size (1 000, 3 000, 10 000, 30 000, 105 000 jets)
 for the BDT and the PFN (3 seeds below 10 000), with ParT-small at 30 000 (from T2.5); plot it against the training time
-as well. Give every point at least 2000 planned optimiser steps (`fit(..., min_steps=2000, patience=5)`: `min_steps`
-raises the number of epochs of a small set, and `patience` then stops it at its best validation loss, often after a few
-hundred steps) and validate every size on at least 5000 jets: otherwise the small points measure under-training or a
-noisy choice of epoch, not the size of the data. Where do the curves cross? This curve returns in T6.5. About 15 minutes
-of CPU: run it in the background while you write up T2.5.
+as well. Give every point at least 2000 planned optimiser steps (`fit(..., min_steps=2000, val_every=50, patience=5)`:
+`min_steps` raises the number of epochs of a small set; `patience` counts validations, and an epoch of 1 000 jets is
+only 4 steps, so `val_every=50` validates every 50 steps instead of after every epoch and the run stops after 250 steps
+without improvement, keeping the best state) and validate every size on at least 5000 jets: otherwise the small points
+measure under-training or a noisy choice of epoch, not the size of the data. Do the curves cross, against the
+training size and against the training time, and if so where? This curve returns in T6.5. About 15 minutes of CPU:
+run it in the background while you write up T2.5.
 
 **T2.7** Proposals (about 30 minutes): a quark/gluon tagger on `data/t1_qg_detector.parquet` (label set `"qg"`)
 against a cut on the multiplicity and against the EFN; the `kinpid` features; training at `hadrons` and testing at
@@ -461,25 +468,28 @@ compare with `truth_dr_min` per class), as in Fig. 6 of arXiv:1810.05165.
 **T3.4** Comparing representations with CKA (write your own linear CKA). Check it against `itj.probes.linear_cka`;
 check that it is invariant under orthogonal maps and isotropic scaling, but not under general linear maps. Compute
 the CKA (a) between the blocks of ParT-small and (b) between each model and the observables
-$X_\mathrm{phys} = [m_\mathrm{SD}, \tau_{21}, \tau_{32}, D_2, N, \ln p_T]$. Which model is most "observable-like"?
-*Optional:* two EFN seeds (train a second EFN with `seed=1`, 3 minutes); the four models against each other; a second
-ParT-small seed (12 minutes).
+$X_\mathrm{phys} = [m_\mathrm{SD}, \tau_{21}, \tau_{32}, D_2, N, \ln p_T]$, each column standardised (in GeV the mass
+column would dominate the Gram matrices). Which model is most "observable-like"? *Optional:* two EFN seeds (train a
+second EFN with `seed=1`, 3 minutes); the four models against each other; a second ParT-small seed (12 minutes).
 
 **T3.5** Mass sculpting and decorrelation. Cut the W-against-QCD score of the PFN at $\epsilon_S = 50\,\%$ and compare
 the $m_\mathrm{SD}$ distribution of the QCD jets before and after the cut (`itj.metrics.sculpting_jsd`). Retrain the PFN
-with planing weights that make $m_\mathrm{SD}$ flat in each class (write the weights yourself: 20 bins in [40, 250] GeV,
-the jets outside the range keep the weight 1, then normalise per class to the number of jets of the class and cap at 10;
-pass them with `JetDataset(weights=...)`), and plot $R_{50}$ against $1/\mathrm{JSD}$ for both PFNs (2 trainings of
-about 3 minutes). Then evaluate both on `data/t3_w60.parquet`, `data/t3_w80.parquet`, `data/t3_w100.parquet` and
-`data/t3_w120.parquet` (two-prong jets at other masses): does the decorrelated tagger keep tagging? *Optional:* DisCo
-(arXiv:2001.05310).
+with planing weights that make $m_\mathrm{SD}$ flat in each class (write the weights yourself: 20 bins in [40, 250] GeV;
+a jet in bin $b$ of its class gets $w = (n_\mathrm{in}/20)/n_b$, with $n_\mathrm{in}$ jets of the class in the range and
+$n_b$ in the bin, so that every filled bin carries the same total weight; a jet outside the range gets $w = 1$; then
+normalise per class to the number of jets of the class and cap at 10; pass them with `JetDataset(weights=...)`), and
+plot $R_{50}$ against $1/\mathrm{JSD}$ for both PFNs (2 trainings of about 3 minutes). Then evaluate both on
+`data/t3_w60.parquet`, `data/t3_w80.parquet`, `data/t3_w100.parquet` and `data/t3_w120.parquet` (two-prong jets at other
+masses): does the decorrelated tagger keep tagging? *Optional:* DisCo (arXiv:2001.05310).
 
 **T3.6** Counterfactual jets. Evaluate the T2 taggers on `data/t3_w80.parquet` and on the paired
 `data/t3_w80_noue.parquet`, `data/t3_w80_centre.parquet` and `data/t3_w80_nocoh.parquet` (the same hard processes, one
-switch changed: without the underlying event and with the cells at their centres every track from the jet is
-identical, while without coherence the shower itself changes). Plot the change of the score jet by jet. Which change
-matters most, and which of the T3.2 probe targets change with it? What does this say about what the taggers use (the
-underlying event, the cell grid, the radiation pattern of a colour singlet)?
+switch changed: without the underlying event and with the cells at their centres every track from the jet is identical,
+while without coherence the shower itself changes). Plot the change of the score jet by jet for `noue` and `centre`;
+`nocoh` shares only the hard process with `t3_w80` (its whole shower is drawn again), so compare its score distribution
+and mean with those of `t3_w80` instead. Which change matters most, and which of the T3.2 probe targets change with it?
+What does this say about what the taggers use (the underlying event, the cell grid, the radiation pattern of a colour
+singlet)?
 
 **T3.7** Your own proposal (about 30 minutes): probes on the outputs of the attention blocks, CKA across training
 sizes, probes for `truth_part_from_b`.
@@ -606,7 +616,8 @@ the AUC matrix (T4.5); the agreement between weaver and `itj` and the accuracy o
 - Guard $\tau = 0$, and remember that some JetClass particles lie at $\Delta R > 0.8$
   ([data_format.md](docs/data_format.md#jetclass-oddities)).
 - weaver on a laptop: `--gpus ''` (the CPU), `--num-workers` at most the number of files in each named group (`0` is
-  fine), `--in-memory` for small subsets, `--fetch-step 1` (weaver 0.5.4 fails on a partial read of a Parquet file)
+  fine), `--in-memory` for small subsets (weaver 0.5.4 then needs `--steps-per-epoch`, and `--steps-per-epoch-val`
+  sets the length of the validation), `--fetch-step 1` (weaver 0.5.4 fails on a partial read of a Parquet file)
   and always the split files: never an index selection in the YAML, because weaver applies selections after
   concatenating the files of a fetch. On Apple Silicon weaver picks MPS by itself: set `PYTORCH_ENABLE_MPS_FALLBACK=1`.
 - Check your numbers of T4.2 and T4.3 afterwards against [observables.md](docs/observables.md#jetclass-conventions)
@@ -634,13 +645,13 @@ prong, on the underlying event and on the softest 50 % of the particles; five je
 their $p_T$ and at random, and plot the score against the fraction removed. (b) Truth deletion: remove one W prong
 (`truth_part_prong`) against the same number of random particles. Which attribution method ranks the particles best?
 
-**T5.3** Attention heads. On 500 toy jets, `itj.interpret.attention_stats` gives per block and head the fraction of
-attention that stays within the same prong, next to the expectation for uniform attention (the memory stays flat).
-Are there "prong heads"? Validate the reco-level proxy `itj.interpret.subjet_membership(data, n)` against
-`truth_part_prong` on the toy, then repeat with the proxy on `ParT_kin` and 500 JetClass W and top jets. Run IG (zero
-baseline) on 200 JetClass W jets with `ParT_kin`: what can you say without truth? What can and what cannot be
-concluded from attention (arXiv:1902.10186)? *Optional:* the rank correlation of class attention and IG. About 3
-minutes of CPU.
+**T5.3** Attention heads. On 500 toy jets, `itj.interpret.attention_stats` gives per block and head the fraction of the
+attention on the other particles that stays within the same prong, next to the expectation for uniform attention, and
+the self-attention $A_{ii}$ (the memory stays flat). Are there "prong heads"? Validate the reco-level proxy
+`itj.interpret.subjet_membership(data, n)` against `truth_part_prong` on the toy, then repeat with the proxy on
+`ParT_kin` and 500 JetClass W and top jets. Run IG (zero baseline) on 200 JetClass W jets with `ParT_kin`: what can you
+say without truth? What can and what cannot be concluded from attention (arXiv:1902.10186)? *Optional:* the rank
+correlation of class attention and IG. About 3 minutes of CPU.
 
 **T5.4** The pair bias $U$. (a) Regress $U_{ij}$ of each head on $[\ln k_T, \ln z, \ln\Delta, \ln m^2]$
 (`itj.interpret.pair_features`) for the toy ParT-small and for `ParT_kin`: which Lund coordinate does each head use
@@ -674,7 +685,8 @@ with arXiv:2605.09881 (the ECF basis against the N-subjettiness basis). About a 
 `T5.6_part_probes.pdf` (T5.6).
 
 **Hints**
-- Report both IG baselines. The rows of an attention matrix sum to 1: compare with $1/N$.
+- Report both IG baselines. The rows of an attention matrix sum to 1: compare with $1/N$, and look at the diagonal
+  ($A_{ii}$) separately.
 - Never call `.backward()` on the raw vectors of ParT yourself: use `itj.interpret.input_gradients` (the pair
   features of a particle with itself give NaN gradients otherwise).
 - `itj.augment.max_particles_guard` tells you whether a perturbation would push a jet beyond 128 particles.
@@ -712,13 +724,19 @@ improving?); `partsmall_nopair` on 30 000 jets for 4 epochs.
 **T6.4** Linear evaluation and what it learned. Freeze the encoder and train a logistic regression on its embedding
 (`itj.ssl.linear_eval`) with 1 000 labels and with all labels (train part of `data/t2_detector.parquet`, tested on its
 test part), always next to the random encoder (`reset_parameters`), the supervised PFN of T2.4 and the observables
-$X_\mathrm{phys}$ of T3.4. Where does the pretraining help? Then run the truth probes of T3.2 on the SSL embedding: does
-it know quark from gluon jets, the number of emissions, the opening angle of the W?
+$X_\mathrm{phys}$ of T3.4 (with the same logistic regression and with a BDT as in T2.2). Where does the pretraining
+help? Then run the truth probes of T3.2 on the SSL embedding: does it know quark from gluon jets, the number of
+emissions, the opening angle of the W?
 
 **T6.5** Few labels. The AUC (W against QCD and top against QCD) against the number of labelled jets (100, 300, 1 000,
-3 000, 10 000; 3 seeds) for SSL + linear evaluation, SSL + fine-tuning and supervised training from scratch (with the
-curve of T2.6). Train every point with the rule of T2.6 (`min_steps=2000`, `patience=5`, at least 5000 validation
-jets). Where does pretraining help? About 15 minutes of CPU: run it in the background.
+3 000, 10 000; 3 seeds) for SSL + linear evaluation, SSL + fine-tuning and supervised training from scratch. Train
+every point with the rule of T2.6 (`min_steps=2000`, `val_every=50`, `patience=5`), but on a validation set of as many
+labelled jets as the training set: validation labels are labels too, so count them in the budget (the linear
+evaluation needs none), or train for a fixed number of steps without early stopping. At 100 and 300 labels an epoch is
+one or two steps and a validation costs almost nothing: use `val_every=10`, and if the best state is still the first
+validation, validate more often. Add the curve of T2.6 for reference: it used 5000 validation labels at every size,
+so its gap to your scratch curve is one measure of what the validation labels are worth. Where does pretraining help,
+if anywhere? About 25 minutes of CPU: run it in the background.
 
 **T6.6** Inherited invariances. Run `irc_scan(..., output="embedding")` on the SSL encoder, and the score scan on its
 linear head. Is it more collinear safe than the supervised PFN? Retrain it without `split_collinear` (3.5 minutes) and
@@ -744,10 +762,19 @@ the toy-pretrained encoder to JetClass.
 **Goal:** the first steps of a research project: a pretraining objective beyond contrastive learning, a hunt for
 shortcuts with the tools of both weeks, a paper from the frontier and a one-page proposal.
 
-**T7.1** Masked particle modelling (arXiv:2401.13537, arXiv:2409.12589). Mask 30 % of the particles with
-`itj.ssl.mask_particles(batch, frac=0.3)` and train `partsmall_nopair` to predict the masked
-($\ln p_T$, $\Delta\eta$, $\Delta\phi$) with a regression loss, in $p_T$ order (about 15 minutes). Evaluate the
-encoder linearly as in T6.4.
+**T7.1** Masked particle modelling (arXiv:2401.13537, arXiv:2409.12589). Hide 30 % of the particles of every jet with
+`itj.ssl.mask_particles(batch, frac=0.3)` and train `partsmall_nopair` together with an
+`itj.ssl.MaskedParticleDecoder(64, 3)` on its last particle block (`model.trace(masked).layers["block2"]`) to predict
+the masked ($\ln p_T$, $\Delta\eta$, $\Delta\phi$), each standardised, with a regression loss (the first 30 000 jets of
+`data/t6_pretrain.parquet`, 8 epochs of batch 256, about 15 minutes). A masked particle is an empty token and ParT
+without $U$ has no notion of order, so every masked slot of a jet gets the same encoder output: the decoder adds the
+$p_T$ rank of each slot (a learned slot embedding), and the encoder has to write what it infers about the hidden
+particles into that output. Compare the masked loss of each target with trivial predictors (the mean of the visible
+particles of the jet; for $\ln p_T$ the mean of the visible rank neighbours of the slot): which targets does the model
+learn beyond them? Evaluate the encoder linearly as in T6.4, against the random encoder, on the class token and on the
+mean of the last particle block (`extract(..., layers="all")["pooled/block2"]`): the masked loss never trains the
+class-attention blocks. *Optional:* the masked-autoencoder variant, `mask_particles(..., drop=True)` (the encoder sees
+only the visible particles) with `MaskedParticleDecoder(64, 3, num_layers=1)`: does its encoder learn more or less?
 
 **T7.2** Shortcut hunting. (a) A known shortcut: train a PFN with the particle types,
 `build_model("pfn", feature_set="kinpid")` (3 minutes), on `data/t7_shortcut.parquet` (W jets with a $\pi^0$ share of
@@ -761,7 +788,9 @@ to remove it and only then to run `jetgen info data/t7_mystery.parquet --reveal`
 **T7.3** A paper from the frontier: one of arXiv:2412.03673, arXiv:2512.00210, arXiv:2605.09881 and arXiv:2401.13537.
 Reproduce one figure qualitatively on the toy, or probe every block of `ParT_full` on all ten classes (the example file,
 `data/jetclass/example/JetClass_example_100k.root`: `itj.jetclass.load_jetclass("example", ("all",), part="test")` gives
-2 000 jets of each class, about 1.5 minutes of inference) and compare with arXiv:2412.03673.
+2 000 jets of each class, about 1.5 minutes of inference) and compare with arXiv:2605.09881 (probes) and your T5.6;
+arXiv:2412.03673 analyses only the attention of the final layer (no probes): compare the attention of the last block
+with its claim of sparse, nearly binary attention.
 
 **T7.4** A research proposal (one page): the question, why it matters, the data, the method, the first experiment and
 its figure, what would change your mind, the compute and the risks; motivated by one of your results of T1 to T6.
@@ -771,7 +800,7 @@ shortcut away (T7.2); one figure (T7.3); the proposal (T7.4).
 
 **Hints**
 - T7.2: compare the counts of each particle type between the classes before you train anything.
-- The provenance of the mystery file holds the override only scrambled (`jetgen info --provenance` shows a placeholder,
-  `jetgen info --reveal` prints it); the mapping from the seed to the shortcut and the scrambling are in the source
-  code, so do not read `itj.toy.mystery` before you are done.
+- The provenance of the mystery file holds the override and the statistics of the run only scrambled
+  (`jetgen info --provenance` shows placeholders, `jetgen info --reveal` prints them); the mapping from the seed to the
+  shortcut and the scrambling are in the source code, so do not read `itj.toy.mystery` before you are done.
 - T7.3: the example file is ROOT; `load` reads it with the `analysis` extra.

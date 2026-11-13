@@ -537,9 +537,10 @@ def irc_scan(
     Every perturbed data set comes from :mod:`itj.augment` with ``keep_sign=True`` (the ``part_deta`` sign of the
     unperturbed jet) and is compared with the unperturbed jets passed through ``itj.augment.recompute``, so that
     only the perturbation differs. "soft": ``add_soft(n=n, eps=value)`` (n photons of pT ``value * jet_pt`` each,
-    uniform in the jet disc); "collinear": ``split_collinear(which="hardest", lam=lam, delta=value)``. The same
-    random numbers (``seed``) are used for every value, so the curves are smooth in the value. Jets that would
-    exceed 128 particles after the perturbation are left out (with a log message): the models would truncate them.
+    uniform in the jet disc); "collinear": ``split_collinear(which="hardest", lam=lam, delta=value, float64=False)``
+    (float32 pieces, as the networks read them). The same random numbers (``seed``) are used for every value, so the
+    curves are smooth in the value. Jets that would exceed 128 particles after the perturbation are left out (with a
+    log message): the models would truncate them.
 
     Parameters
     ----------
@@ -635,7 +636,9 @@ def irc_scan(
         if mode == "soft":
             pert = augment.add_soft(jets, n=n, eps=float(value), rng=rng, keep_sign=True)
         else:
-            pert = augment.split_collinear(jets, which="hardest", lam=lam, delta=float(value), rng=rng, keep_sign=True)
+            pert = augment.split_collinear(
+                jets, which="hardest", lam=lam, delta=float(value), rng=rng, keep_sign=True, float64=False
+            )
         augment.max_particles_guard(pert, MAX_PARTICLES)
         out = _forward_chunks(model, pert, label_set=None, batch_size=batch_size, embedding=embedding)
         for key, v in summarise(out["values"]).items():
@@ -683,10 +686,13 @@ def subjet_membership(data: JetData, n: int) -> Ragged:
 def attention_stats(model: ParT, data: JetData, groups: Ragged, *, batch_size: int = 128) -> dict[str, np.ndarray]:
     """Return how much each attention head stays within particle groups (prongs or subjets), batch by batch.
 
-    For every query particle with a group (>= 0) the share of its attention that goes to real particles of the same
-    group is averaged over all such queries of all jets. Uniform attention over the real particles gives
-    ``n_same / n_real`` (the "random_expectation"). Only one batch of attention maps is in memory at a time (about
-    ``batch_size * H * P^2 * 4`` bytes per block).
+    Self-attention is counted on its own: for a query particle i with a group (>= 0) in a jet of at least two real
+    particles, the attention left after the self term, ``1 - A_ii``, is split into the share on the other real
+    particles of the same group and the share on the rest, and the same-group share is averaged over all such queries
+    of all jets. Uniform attention over the other real particles gives ``(n_same - 1) / (n_real - 1)`` (the
+    "random_expectation", n_same including i). The mean of ``A_ii`` itself is returned as "self": without this split
+    a head that mostly attends to the particle itself would look like a head that stays within the prong. Only one
+    batch of attention maps is in memory at a time (about ``batch_size * H * P^2 * 4`` bytes per block).
 
     Parameters
     ----------
@@ -703,9 +709,13 @@ def attention_stats(model: ParT, data: JetData, groups: Ragged, *, batch_size: i
     Returns
     -------
     dict of str to numpy.ndarray
-        "within_group" and "random_expectation" (n_blocks, H); "class_within" (n_cls_blocks, H, G): the share of the
-        class token's attention on the particles of group g = 0 .. G-1 (G = largest group + 1), averaged over jets;
-        "class_random_expectation" (G,): the share of real particles in group g, averaged over jets.
+        "within_group" and "random_expectation" (n_blocks, H): the mean share of the attention on the other particles
+        that stays in the group of the query, and its value for uniform attention (queries with ``1 - A_ii < 1e-6``
+        are left out of both); "self" (n_blocks, H): the mean self-attention ``A_ii`` over all queries, those left
+        out of "within_group" included;
+        "class_within" (n_cls_blocks, H, G): the share of the class token's attention on the particles of group
+        g = 0 .. G-1 (G = largest group + 1), averaged over jets; "class_random_expectation" (G,): the share of real
+        particles in group g, averaged over jets.
     """
     from .models import make_inputs
 
@@ -715,7 +725,7 @@ def attention_stats(model: ParT, data: JetData, groups: Ragged, *, batch_size: i
     n_groups = int(groups.values.max()) + 1 if len(groups.values) else 0
     n_groups = max(n_groups, 0)
     device = next((p.device for p in model.parameters()), torch.device("cpu"))
-    within = random = class_sum = class_random = None
+    within = random = self_sum = n_valid = class_sum = class_random = None
     n_queries = 0.0
     n_jets = 0
     with _eval_mode(model), torch.no_grad():
@@ -731,35 +741,49 @@ def attention_stats(model: ParT, data: JetData, groups: Ragged, *, batch_size: i
             g = torch.as_tensor(groups.select(idx).padded(p, fill=-1).astype(np.int64), device=device)
             real = trace.mask if trace.mask is not None else batch.particle_mask
             g = torch.where(real, g, torch.full_like(g, -1))
-            query = real & (g >= 0)
-            same = (g[:, :, None] == g[:, None, :]) & query[:, :, None] & real[:, None, :]
+            n_real = real.double().sum(-1, keepdim=True)  # (B, 1)
+            query = real & (g >= 0) & (n_real >= 2)
+            eye = torch.eye(p, dtype=torch.bool, device=device)
+            same = (g[:, :, None] == g[:, None, :]) & query[:, :, None] & real[:, None, :] & ~eye
             same_f = same.double()
             query_f = query.double()
-            stack = torch.stack([(a.double() * same_f[:, None]).sum(-1) for a in blocks])  # (L, B, H, P)
-            w = (stack * query_f[None, :, None, :]).sum(dim=(1, 3)).cpu().numpy()  # (L, H)
-            n_real = real.double().sum(-1, keepdim=True).clamp(min=1)
-            r = float(((same_f.sum(-1) / n_real) * query_f).sum())
+            expect = same_f.sum(-1) / (n_real - 1).clamp(min=1)  # (B, P): uniform over the other particles
+            diag = torch.stack([torch.diagonal(a, dim1=-2, dim2=-1).double() for a in blocks])  # (L, B, H, P)
+            off = torch.stack([(a.double() * same_f[:, None]).sum(-1) for a in blocks])  # (L, B, H, P)
+            rest = 1.0 - diag
+            valid = (rest >= 1e-6) & query[None, :, None, :]  # (L, B, H, P)
+            valid_f = valid.double()
+            share = torch.where(valid, off / rest.clamp(min=1e-6), torch.zeros_like(off))
+            w = share.sum(dim=(1, 3)).cpu().numpy()  # (L, H)
+            r = (expect[None, :, None, :] * valid_f).sum(dim=(1, 3)).cpu().numpy()
+            sd = (diag * query_f[None, :, None, :]).sum(dim=(1, 3)).cpu().numpy()
+            nv = valid_f.sum(dim=(1, 3)).cpu().numpy()
             within = w if within is None else within + w
             random = r if random is None else random + r
+            self_sum = sd if self_sum is None else self_sum + sd
+            n_valid = nv if n_valid is None else n_valid + nv
             n_queries += float(query_f.sum())
             onehot = torch.stack([(g == k) & real for k in range(n_groups)], dim=-1).double()  # (B, P, G)
             c = torch.stack([a[:, :, 0, 1:].double() for a in cls_blocks]) if cls_blocks else None  # (K, B, H, P)
             if c is not None:
                 cs = torch.einsum("kbhp,bpg->khg", c, onehot).cpu().numpy()
                 class_sum = cs if class_sum is None else class_sum + cs
-            cr = (onehot.sum(1) / n_real).sum(0).cpu().numpy()  # (G,)
+            cr = (onehot.sum(1) / n_real.clamp(min=1)).sum(0).cpu().numpy()  # (G,)
             class_random = cr if class_random is None else class_random + cr
             n_jets += len(idx)
-            del trace, stack, same
+            del trace, off, diag, share, same
     n_heads = blocks[0].shape[1]
-    denom = max(n_queries, 1.0)
-    within_arr = np.asarray(within) / denom
-    random_arr = np.full_like(within_arr, float(random or 0.0) / denom)
+    assert within is not None
+    assert random is not None
+    assert self_sum is not None
+    assert n_valid is not None
+    denom = np.maximum(n_valid, 1.0)
     if class_sum is None:
         class_sum = np.zeros((0, n_heads, n_groups))
     return {
-        "within_group": within_arr,
-        "random_expectation": random_arr,
+        "within_group": within / denom,
+        "random_expectation": random / denom,
+        "self": self_sum / max(n_queries, 1.0),
         "class_within": np.asarray(class_sum) / max(n_jets, 1),
         "class_random_expectation": np.asarray(class_random) / max(n_jets, 1)
         if class_random is not None

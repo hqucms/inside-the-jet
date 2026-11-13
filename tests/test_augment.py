@@ -361,3 +361,25 @@ def test_split_collinear_conserves_momentum_for_float32_tachyons(jetclass_sample
     sums_b = np.stack([np.bincount(row_b, weights=before[:, k]) for k in range(4)], axis=1)
     sums_a = np.stack([np.bincount(row_a, weights=after[:, k]) for k in range(4)], axis=1)
     np.testing.assert_allclose(sums_a, sums_b, rtol=0, atol=1e-6 * np.abs(sums_b[:, 3:]).max())
+
+
+def test_split_collinear_in_float64_has_no_rounding_floor(jetclass_sample: JetData, tmp_path) -> None:
+    # float32 pieces of a TeV particle get a spurious mass of ~0.1 GeV each; float64 pieces sum to the particle
+    from itj.io import load, save
+
+    ref = augment.recompute(jetclass_sample, substructure=True)
+    for lam in (0.2, 0.3):
+        out = augment.split_collinear(jetclass_sample, lam=lam, delta=0.0, substructure=True)
+        assert out["part_px"].dtype == np.float64
+        assert out["part_deta"].dtype == np.float64
+        assert np.asarray(out["jet_sdmass"]).dtype == np.float64
+        assert np.asarray(out["jet_nparticles"]).dtype == np.asarray(jetclass_sample["jet_nparticles"]).dtype
+        for name in ("jet_sdmass", "jet_tau2", "jet_pt"):
+            np.testing.assert_allclose(np.asarray(out[name]), np.asarray(ref[name], np.float64), rtol=1e-6)
+    stored = augment.split_collinear(jetclass_sample, lam=0.2, float64=False)
+    assert stored["part_px"].dtype == np.float32
+    assert np.asarray(stored["jet_pt"]).dtype == np.float32
+    # files keep their dtypes
+    path = tmp_path / "split.parquet"
+    save(augment.split_collinear(jetclass_sample.head(5), lam=0.2), path)
+    assert load(path)["part_px"].dtype == np.float32

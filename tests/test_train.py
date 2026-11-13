@@ -43,7 +43,16 @@ def test_loss_decreases(dataset: JetDataset) -> None:
     loss = -np.mean(np.log(probs[np.arange(len(labels)), labels]))
     assert loss == pytest.approx(min(h.val_loss), rel=1e-4)
     d = h.to_dict()
-    assert set(d) == {"train_loss", "val_loss", "train_acc", "val_acc", "wall_time_s", "jets_per_s", "best_epoch"}
+    assert set(d) == {
+        "train_loss",
+        "val_loss",
+        "train_acc",
+        "val_acc",
+        "wall_time_s",
+        "jets_per_s",
+        "steps",
+        "best_epoch",
+    }
     json.dumps(d)
 
 
@@ -74,6 +83,30 @@ def test_max_minutes_min_steps_patience_and_callback(dataset: JetDataset) -> Non
     assert seen == [0, 1]
     assert h.best_epoch == 0
     assert np.isnan(fit(tiny_pfn(), dataset, epochs=1, quiet=True).val_loss[0])
+
+
+def test_val_every_makes_patience_a_number_of_steps(dataset: JetDataset, capsys: pytest.CaptureFixture[str]) -> None:
+    # 150 jets in batches of 50: 3 steps per epoch; validate once at least 7 steps have passed
+    h = fit(tiny_pfn(), dataset, dataset, epochs=8, batch_size=50, val_every=7, quiet=True)
+    assert h.steps == [3 * (e + 1) for e in range(8)]
+    validated = [e for e, v in enumerate(h.val_loss) if np.isfinite(v)]
+    assert validated == [2, 5, 7]  # steps 9 and 18, and always the last epoch (24)
+    assert np.isnan(h.val_acc[0])
+    assert np.isfinite(h.val_loss[h.best_epoch])
+    # patience counts validations: with lr 0 the first validation stays the best
+    h = fit(tiny_pfn(), dataset, dataset, epochs=50, batch_size=50, lr=0.0, val_every=6, patience=2, quiet=True)
+    assert [e for e, v in enumerate(h.val_loss) if np.isfinite(v)] == [1, 3, 5]
+    assert len(h) == 6
+    assert h.best_epoch == 1
+    # without validation data the epoch lines follow the same schedule
+    capsys.readouterr()
+    fit(tiny_pfn(), dataset, epochs=8, batch_size=50, val_every=7, log_every=0)
+    lines = [line for line in capsys.readouterr().out.splitlines() if line.startswith("epoch ")]
+    assert [line.split()[1] for line in lines] == ["3/8", "6/8", "8/8"]
+    with pytest.raises(ValueError, match="val_every"):
+        fit(tiny_pfn(), dataset, dataset, val_every=0, quiet=True)
+    with pytest.raises(ValueError, match="patience"):
+        fit(tiny_pfn(), dataset, dataset, patience=0, quiet=True)
 
 
 def test_weights(dataset: JetDataset, jetclass_sample: JetData) -> None:

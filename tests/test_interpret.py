@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from copy import deepcopy
+from typing import Any
 
 import numpy as np
 import pytest
@@ -354,6 +355,34 @@ def test_subjet_membership() -> None:
     np.testing.assert_array_equal(three.offsets, jet["part_px"].offsets)  # type: ignore[union-attr]
 
 
+def test_attention_stats_does_not_count_self_attention_as_within_group(
+    jets: JetData, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A head that attends to the particle itself and uniformly to the rest is not a prong head."""
+    model = _calibrated("partsmall", jets)
+    data = jets.head(12)
+    groups = interpret.subjet_membership(data, 2)
+    original = type(model).trace
+
+    def self_heads(self: Any, batch: Any, *, attention: bool = False) -> Any:
+        tr = original(self, batch, attention=attention)
+        real = tr.mask.double()  # (B, P)
+        n = real.sum(-1)[:, None, None, None]
+        p = real.shape[1]
+        eye = torch.eye(p, dtype=torch.float64)
+        uniform_others = real[:, None, None, :] * (1 - eye) / (n - 1)
+        a = 0.6 * eye + 0.4 * uniform_others  # A_ii = 0.6, the rest uniform over the other real particles
+        a = (a * real[:, None, :, None]).expand(-1, 4, -1, -1).to(torch.float32)
+        tr.attention = dict.fromkeys(tr.attention, a)
+        return tr
+
+    monkeypatch.setattr(type(model), "trace", self_heads)
+    stats = interpret.attention_stats(model, data, groups, batch_size=5)
+    np.testing.assert_allclose(stats["self"], 0.6, rtol=1e-6)
+    np.testing.assert_allclose(stats["within_group"], stats["random_expectation"], rtol=1e-5)
+    assert np.all(stats["random_expectation"] < 0.6)
+
+
 def test_attention_stats_equals_the_full_trace(jets: JetData) -> None:
     model = _calibrated("partsmall", jets)
     data = jets.head(20)
@@ -365,12 +394,16 @@ def test_attention_stats_equals_the_full_trace(jets: JetData) -> None:
     assert stats["random_expectation"].shape == (n_blocks, n_heads)
     assert stats["class_within"].shape == (1, n_heads, 3)
 
+    assert stats["self"].shape == (n_blocks, n_heads)
+
     # the same numbers from one trace of all 20 jets, written out with loops
     with torch.no_grad():
         batch = make_inputs(model, data)
         trace = model.trace(batch, attention=True)
     within = np.zeros((n_blocks, n_heads))
-    random = 0.0
+    random = np.zeros((n_blocks, n_heads))
+    selfs = np.zeros((n_blocks, n_heads))
+    n_valid = np.zeros((n_blocks, n_heads))
     n_queries = 0
     cls = np.zeros((1, n_heads, 3))
     cls_random = np.zeros(3)
@@ -378,20 +411,26 @@ def test_attention_stats_equals_the_full_trace(jets: JetData) -> None:
         g = groups[j].astype(np.int64)
         n = len(g)
         for q in range(n):
-            if g[q] < 0:
+            if g[q] < 0 or n < 2:
                 continue
-            same = g == g[q]
+            others = np.arange(n) != q
+            same = (g == g[q]) & others
             n_queries += 1
-            random += same.sum() / n
             for blk in range(n_blocks):
                 a = trace.attention[f"block{blk}"][j, :, q, :n].double().numpy()
-                within[blk] += a[:, same].sum(axis=1)
+                selfs[blk] += a[:, q]
+                rest = 1.0 - a[:, q]
+                ok = rest >= 1e-6
+                within[blk] += np.where(ok, a[:, same].sum(axis=1) / np.maximum(rest, 1e-6), 0.0)
+                random[blk] += np.where(ok, same.sum() / (n - 1), 0.0)
+                n_valid[blk] += ok
         c = trace.class_attention["cls0"][j, :, 0, 1 : n + 1].double().numpy()
         for k in range(3):
             cls[0, :, k] += c[:, g == k].sum(axis=1)
             cls_random[k] += np.sum(g == k) / n
-    np.testing.assert_allclose(stats["within_group"], within / n_queries, rtol=1e-5)
-    np.testing.assert_allclose(stats["random_expectation"], np.full((n_blocks, n_heads), random / n_queries))
+    np.testing.assert_allclose(stats["within_group"], within / n_valid, rtol=1e-5)
+    np.testing.assert_allclose(stats["random_expectation"], random / n_valid, rtol=1e-10)
+    np.testing.assert_allclose(stats["self"], selfs / n_queries, rtol=1e-5)
     np.testing.assert_allclose(stats["class_within"], cls / len(data), rtol=1e-5)
     np.testing.assert_allclose(stats["class_random_expectation"], cls_random / len(data), rtol=1e-10)
     with pytest.raises(ValueError, match="aligned"):

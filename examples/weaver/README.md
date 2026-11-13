@@ -137,9 +137,12 @@ full ParT (2.1 M parameters) or ParticleNet on QCD, W and top. With the training
 (`jetgen fetch jetclass --split train`, 100 000 jets per class, 374 MB) and the split validation files:
 
 ```bash
-weaver --data-train 'QCD:data/jetclass/train/ZJetsToNuNu_000.parquet' 'Wqq:data/jetclass/train/WToQQ_000.parquet' 'Tbqq:data/jetclass/train/TTBar_000.parquet' --data-val 'QCD:data/jetclass/split/val/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/val/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/val/TTBar_120.parquet' --data-test 'QCD:data/jetclass/split/test/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/test/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/test/TTBar_120.parquet' --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py --model-prefix runs/weaver_part/net --gpus 0 --num-workers 1 --batch-size 512 --start-lr 1e-3 --num-epochs 20 --optimizer ranger --use-amp --in-memory --fetch-step 1 --predict-output pred.parquet
+weaver --data-train 'QCD:data/jetclass/train/ZJetsToNuNu_000.parquet' 'Wqq:data/jetclass/train/WToQQ_000.parquet' 'Tbqq:data/jetclass/train/TTBar_000.parquet' --data-val 'QCD:data/jetclass/split/val/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/val/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/val/TTBar_120.parquet' --data-test 'QCD:data/jetclass/split/test/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/test/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/test/TTBar_120.parquet' --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py --model-prefix runs/weaver_part/net --gpus 0 --num-workers 1 --batch-size 512 --start-lr 1e-3 --num-epochs 20 --steps-per-epoch 585 --steps-per-epoch-val 58 --optimizer ranger --use-amp --in-memory --fetch-step 1 --predict-output pred.parquet
 ```
 
+`--in-memory` needs `--steps-per-epoch` (weaver stops at once without it): 300 000 training jets / 512 = 585 steps per
+epoch, and `--steps-per-epoch-val 58` validates on the 30 000 validation jets once per epoch (without it weaver would
+take 146 steps, the training steps scaled by its default train/validation split, and cycle the validation jets).
 For ParticleNet replace the network configuration by `examples/weaver/networks/example_ParticleNet.py` and the model
 prefix by `runs/weaver_pn/net`; `jets3_kinpid.yaml` and `jets3_full.yaml` add the particle types and the impact
 parameters. `--use-amp` (mixed precision, as in the ParT repository) is needed for a batch of 512 on an 11 GB GPU:

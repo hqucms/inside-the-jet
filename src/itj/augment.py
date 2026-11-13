@@ -173,21 +173,25 @@ def _rebuild(
     added: Mapping[str, np.ndarray] | None = None,
     axis: tuple[np.ndarray, np.ndarray] | None = None,
     substructure: bool = False,
+    float64: bool = False,
 ) -> JetData:
     """Return ``data`` with new particles and every derived column recomputed.
 
     ``p4`` (M, 4) are the new particles jet by jet (``counts`` per jet), ``source`` the index of the old particle
     whose other columns each one copies (-1: a new particle, its columns from ``added`` or the defaults). ``sign``
     fixes s per jet (None: from the new jets); ``axis`` fixes (eta_jet, phi_jet) (None: from the new jets).
+    ``float64`` keeps the four-momenta and every float column recomputed from them in float64 instead of the dtype of
+    ``data``.
     """
     n_jets = len(data)
     row = np.repeat(np.arange(n_jets, dtype=np.int64), counts)
-    # the four-momenta as stored (float32 for files); the sorting and everything else are computed from them
+    # the four-momenta as stored (float32 for files, unless float64); the sorting and everything else are computed
+    # from them
     stored: dict[str, np.ndarray] = {}
     for k, name in enumerate(_P4_COLUMNS):
         col = data[name]
         assert isinstance(col, Ragged)
-        stored[name] = p4[:, k].astype(col.values.dtype)
+        stored[name] = p4[:, k].astype(np.float64 if float64 else col.values.dtype)
     p4 = np.stack([stored[name].astype(np.float64) for name in _P4_COLUMNS], axis=1)
     pt = np.hypot(p4[:, 0], p4[:, 1])
     order = np.lexsort((-pt, row))
@@ -227,7 +231,7 @@ def _rebuild(
         if isinstance(col, Ragged) and column_group(name, jagged=True) == "particle":
             dtype = col.values.dtype
             if name in stored:
-                values = stored[name].astype(dtype)
+                values = stored[name].astype(np.float64 if float64 else dtype)
             else:
                 values = np.zeros((len(source), *col.values.shape[1:]), dtype=dtype)
                 values[old] = col.values[source[old]]
@@ -236,7 +240,8 @@ def _rebuild(
                     values[new_index] = np.asarray(default)[new_index] if np.ndim(default) else default
             columns[name] = Ragged(values, offsets)
         elif name in jet:
-            columns[name] = np.asarray(jet[name]).astype(np.asarray(col).dtype)
+            keep64 = float64 and name != "jet_nparticles"
+            columns[name] = np.asarray(jet[name]).astype(np.float64 if keep64 else np.asarray(col).dtype)
         else:
             columns[name] = col
     if substructure:
@@ -491,6 +496,7 @@ def split_collinear(
     rng: np.random.Generator | int | None = None,
     substructure: bool = False,
     keep_sign: bool = False,
+    float64: bool = True,
 ) -> JetData:
     """Split particles into two collinear (or nearly collinear) pieces with momentum fractions lam and 1 - lam.
 
@@ -500,6 +506,12 @@ def split_collinear(
     random azimuth through the particle, with their pT-weighted centre on the original direction; their sum tends to
     the particle as ``delta -> 0``, also for float32 particles with a slightly negative m^2. Both pieces copy the other
     columns of the particle.
+
+    The result holds the four-momenta, ``part_deta``, ``part_dphi`` and the recomputed jet columns (except
+    ``jet_nparticles``) in float64 (``float64=True``, the default), so that the pieces of every particle sum to it to
+    float64 precision. Stored as float32 (``float64=False``, the dtype of a file), each piece is rounded on its own:
+    for ``lam`` other than 0.5 a piece of a TeV particle then has a spurious mass of order 0.1 GeV, which sets a floor
+    under the collinear scan of a groomed mass. :func:`itj.io.save` writes the columns as float32 in either case.
 
     Parameters
     ----------
@@ -518,6 +530,8 @@ def split_collinear(
         Random numbers (azimuths, ``"random"``, ``frac``).
     substructure, keep_sign : bool
         See :func:`recompute`.
+    float64 : bool
+        Keep the new four-momenta and the columns recomputed from them in float64 (False: in the dtype of ``data``).
 
     Returns
     -------
@@ -558,7 +572,7 @@ def split_collinear(
         for mask_, f, shift in ((first, lam, (1.0 - lam) * delta), (second, 1.0 - lam, -lam * delta)):
             new[mask_] = _compose(f * s_pt, s_y + shift * ux, s_phi + shift * uy, f * s_mt)
     new_counts = counts + np.bincount(row[chosen], minlength=len(counts))
-    return _rebuild(data, new, new_counts, source, sign=sign, substructure=substructure)
+    return _rebuild(data, new, new_counts, source, sign=sign, substructure=substructure, float64=float64)
 
 
 def add_soft(

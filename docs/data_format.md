@@ -1,10 +1,10 @@
 # Data format
 
-Every run of `jetgen generate` (or `save()` in Python) writes one Parquet file with one row per jet. This page
-describes format version 1, written by `itj` 0.1.0. The columns are those of JetClass, with the same names, dtypes and
+Every run of `jetgen generate` (or `save()` in Python) writes one Parquet file with one row per jet. This page describes
+format version 1, written by `itj` 0.1.0 and 0.1.1. The columns are those of JetClass, with the same names, dtypes and
 meaning, followed by the toy's truth columns, so that one reader (`itj.io.load`), one set of network inputs and one
-weaver data configuration work on the toy files and on the JetClass files alike. Below, `N` is the number of jets.
-The physics behind the stored quantities is in [physics.md](physics.md), the observables in
+weaver data configuration work on the toy files and on the JetClass files alike. Below, `N` is the number of jets. The
+physics behind the stored quantities is in [physics.md](physics.md), the observables in
 [observables.md](observables.md).
 
 ```text
@@ -187,7 +187,7 @@ truth:     -1 <= truth_part_prong <= truth_nprongs - 1; truth_part_prong == -1 i
 | `seed`, `first_event_id`, `chunk_size` | random seed, the id of the first jet, jets per chunk (1000) |
 | `workers` | worker processes (the output does not depend on it) |
 | `preset`, `processes`, `overrides`, `process_overrides` | the CLI preset, the process list, the changed options and the per-process changes (`--override`; absent for `--mystery`) |
-| `mystery` | only with `--mystery`: the planted shortcut, scrambled with a key (`jetgen info --provenance` prints a placeholder, `jetgen info --reveal` decodes it) |
+| `mystery` | only with `--mystery`: the planted shortcut and the run statistics it changes (`containment_efficiency`, `hadron_kt_capped`, `stage_times_s`, which the file stores as a placeholder), scrambled with a key (`jetgen info --provenance` prints a placeholder, `jetgen info --reveal` decodes it) |
 | `containment_efficiency` | per process: the fraction of hard processes that passed containment |
 | `hadron_kt_capped` | fraction of hadrons whose transverse kick was capped |
 | `hadron_reshuffle` | the hadron-level reshuffle (`hadron_reshuffle`, also through a per-process override): `steps` tried (one per W, two per top), `failed` (systems heavier than the resonance, left unchanged), `failed_w_in_top` (the failed first steps of tops: the top is still restored, its W is not) and `max_residual`, the largest $\max_\mu \lvert\sum p^\mu - P^\mu\rvert / E$ of the restored resonances; zeros when it is off. A merged file of different runs has no provenance, so `check_identities` then skips `hadron_sum` |

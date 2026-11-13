@@ -12,8 +12,8 @@ abstract: >-
 authors:
   - name: "<AUTHOR>"
     affiliation: "<AFFILIATION>"
-version: 0.1.0
-date-released: 2026-11-05
+version: 0.1.1
+date-released: 2026-11-13
 license: MIT
 repository-code: "https://github.com/hqucms/inside-the-jet"
 url: "https://github.com/hqucms/inside-the-jet"

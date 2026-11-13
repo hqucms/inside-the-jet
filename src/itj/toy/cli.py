@@ -223,7 +223,9 @@ def build_parser() -> argparse.ArgumentParser:
         "JetClass numbers (each row passes within max(5 sigma, 3 %) of its calibrated value).",
         formatter_class=_HelpFormatter,
     )
-    val.add_argument("-n", "--n-jets", type=int, default=10_000, metavar="N", help="jets per sample")
+    val.add_argument(
+        "-n", "--n-jets", type=int, default=10_000, metavar="N", help="jets per sample (Lund samples: at least 10000)"
+    )
     val.add_argument("--seed", type=int, default=0, help="random seed")
     val.add_argument("--workers", type=_workers, default=1, metavar="N|auto", help="worker processes")
     val.add_argument(
@@ -497,7 +499,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _generate(args: argparse.Namespace, argv: list[str]) -> None:
     from ..io import save
     from .generate import generate
-    from .mystery import encode, mystery_overrides
+    from .mystery import mystery_overrides, plant
 
     if args.n_jets < 1:
         raise ValueError(f"-n/--n-jets must be a positive integer, got {args.n_jets}")
@@ -550,13 +552,12 @@ def _generate(args: argparse.Namespace, argv: list[str]) -> None:
     )
     provenance = dict(data.provenance or {})
     provenance["command_line"] = "jetgen " + shlex.join(argv)
-    if args.mystery:
-        provenance.pop("process_overrides", None)
-        provenance["mystery"] = encode(args.seed)
     # the provenance is written with the file: the write time is measured on the first chunk and scaled
     stage_times = dict(provenance.get("stage_times_s") or {})
     stage_times["write"] = round(_estimate_write(data, args.row_group_size, truth=not args.no_truth), 4)
     provenance["stage_times_s"] = stage_times
+    if args.mystery:
+        provenance = plant(provenance, args.seed)
     data = type(data)(data.columns, config=data.config, provenance=provenance, source=data.source)
     start = time.perf_counter()
     save(data, output, overwrite=args.overwrite, row_group_size=args.row_group_size, truth=not args.no_truth)

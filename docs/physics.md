@@ -4,7 +4,7 @@
 boson or a top quark with a large transverse momentum, a parton shower turns it into a spray of partons, a cartoon of
 hadronisation turns the partons into hadrons, an underlying event adds soft particles, and a simple detector turns
 the hadrons into tracks and calorimeter cells. The jet is then built as in JetClass. This page defines the model as
-implemented in `itj.toy` (version 0.1.0), with the derivations that the tasks use. The defaults are those of the
+implemented in `itj.toy` (version 0.1.1), with the derivations that the tasks use. The defaults are those of the
 `detector` preset. The data files are described in [data_format.md](data_format.md), the observables in
 [observables.md](observables.md), and the literature values behind the defaults, with their sources, in
 [references.md](references.md).
@@ -832,10 +832,13 @@ that apply `jetclass_selection` first.
 | `hadron_cap_fraction` | hadrons with a capped $k_T$, `hadrons` | 5.5 % | | < 20 % |
 | `speed_detector` | jets per second and core | about 850 | target 500 | > 100 |
 
-The toy numbers are the means of five seeds with `-n 10000`. A row passes if its value lies within the larger of 5
-standard errors (of the run) and 3 % of the toy number, and inside the accepted range; `d2_ratio`,
-`hadron_cap_fraction` and `speed_detector` have the accepted range only. T4.1 repeats the comparison with the full
-distributions.
+The toy numbers are the means of five seeds with `-n 10000`. The two Lund samples (the first five rows) have at least
+10 000 jets whatever `-n` says: they take about a second each, and on fewer jets the parabola fit of the broad mass
+peaks is unstable. Even at 10 000 jets `mass_peak_q` moves by about 4 GeV from seed to seed (and its fit is unstable
+for an occasional seed), so a NO in that row alone on another seed is a fluctuation of the fit. A row passes if its
+value lies within the larger of 5 standard errors (of the run) and 3 % of the toy number, and inside the accepted range;
+`d2_ratio`, `hadron_cap_fraction` and `speed_detector` have the accepted range only. T4.1 repeats the comparison with
+the full distributions.
 
 **Where the toy differs from JetClass.** The composition by particle type, the mean QCD multiplicity and the $\tau_{21}$
 and $\tau_{32}$ medians of QCD and W match JetClass to 1-2 %. The rest is a list of ways in which **the toy is

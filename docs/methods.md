@@ -132,10 +132,12 @@ may carry little information, other weights can give the same output, and the re
 Treat attention as a description of the computation, test claims against controls, and compare with attributions.
 
 - **Head statistics.** `itj.interpret.attention_stats(model, data, groups)` measures, per block and head, the mean
-  fraction of attention that a particle gives to particles of its own group (prong), against the same fraction for
-  uniform attention (each particle gives $1/N$ to every particle). On the toy the groups are the true prongs; on
-  JetClass a reco proxy, `subjet_membership(data, n)` (the exclusive-kT subjet of every particle), validated on the
-  toy first.
+  fraction of the attention that a particle gives to the *other* particles which goes to particles of its own group
+  (prong), against the same fraction for uniform attention over the other particles, $(n_\mathrm{same} - 1)/(N - 1)$.
+  Self-attention ($A_{ii}$) is not counted: a head that attends to the particle itself would otherwise look like a
+  prong head. `attention_stats` returns the mean $A_{ii}$ per block and head as well (`"self"`). On the toy the groups
+  are the true prongs; on JetClass a reco proxy, `subjet_membership(data, n)` (the exclusive-kT subjet of every
+  particle), validated on the toy first.
 - **Rollout** (2005.00928): multiply the attention matrices of the layers, each averaged over heads and mixed with the
   identity for the residual connection, $\tilde A = \prod_l \bigl(\tfrac{1}{2}(\bar A^{(l)} + \mathbb{1})\bigr)$, and
   read the row of the class token (`attention_rollout`).
@@ -177,11 +179,15 @@ Measure it with the Jensen-Shannon divergence between the background mass distri
 $1/\mathrm{JSD}$ at a given rejection.
 
 - **Planing** (1709.10106): weight the training jets so that the mass distribution is flat in every class:
-  $w = 1/\hat p_c(m)$ from a histogram per class $c$ (for example 20 bins on [40, 250] GeV), normalised so that the
-  weights of a class sum to its number of jets, capped (at 10) against empty bins; pass them as
-  `JetDataset(weights=...)`. The network can no longer gain from the mass shape. Say what the jets outside the
-  histogram get: in T3.5 they keep the weight 1 before the normalisation (two thirds of the QCD jets have
-  $m_\mathrm{SD} < 40$ GeV, so dropping them instead, with weight 0, trains a different tagger).
+  $w \propto 1/\hat p_c(m)$ from a histogram per class $c$ (for example 20 bins on [40, 250] GeV), normalised so that
+  the weights of a class sum to its number of jets, capped (at 10) against empty bins; pass them as
+  `JetDataset(weights=...)`. The network can no longer gain from the mass shape. The scale of $1/\hat p_c$ matters as
+  soon as some jets are outside the histogram, so fix it: in T3.5 a jet in bin $b$ of its class gets
+  $w = (n_\mathrm{in}/20)/n_b$ ($n_\mathrm{in}$ jets of the class in the range, $n_b$ in the bin: every filled bin then
+  carries the same total weight, and the in-range weights average 1), a jet outside the range $w = 1$, both before the
+  normalisation. Say what the jets outside the histogram get: two thirds of the QCD jets have
+  $m_\mathrm{SD} < 40$ GeV, so a density per GeV (in-range weights of order 200 against 1 outside) or dropping them
+  (weight 0) trains a different tagger.
 - **DisCo** (2001.05310): add the distance correlation between the score and the mass of background jets to the loss.
 - Others: designed decorrelation (DDT, 1603.00027), adversaries (1611.01046), MoDe (2010.09745).
 
@@ -227,13 +233,18 @@ one-vs-one AUCs). Always compare with:
 - the **random encoder** (the same architecture with random weights): a random network gives a surprisingly good
   representation;
 - the **supervised** model of the same architecture, trained on the same labels;
-- the **observables** $X_\mathrm{phys} = [m_\mathrm{SD}, \tau_{21}, \tau_{32}, D_2, N, \ln p_T]$.
+- the **observables** $X_\mathrm{phys} = [m_\mathrm{SD}, \tau_{21}, \tau_{32}, D_2, N, \ln p_T]$, with a linear model
+  (the same probe as the encoders) and with a BDT (as in T2.2): a linear model cannot make a mass window.
 
 **Fine-tuning** trains the encoder further with the labels, starting from the pretrained weights. The **few-label**
 protocol repeats both with 100 to 10 000 labelled jets (balanced over the classes, several seeds) and plots the AUC
-against the number of labels; train every point for the same number of optimiser steps (at least 2000,
-`fit(..., min_steps=2000)`) with a validation set of at least 5000 jets, so that small points measure data size, not
-under-training. Pretraining pays off where labels are few.
+against the number of labels; plan at least 2000 optimiser steps for every point (`fit(..., min_steps=2000,
+val_every=50, patience=5)`), so that small points measure data size, not under-training. Early stopping needs
+labelled validation jets: a validation set of thousands of labelled jets next to 100 training labels gives fine-tuning
+and training from scratch far more labels than the linear evaluation, which uses none. Give them a validation set as
+large as the training set and count it in the label budget, or train for a fixed number of steps. Compare the
+pretrained encoder both with the random encoder and with training from scratch: the two comparisons answer different
+questions.
 
 Expected values on JetClass (QCD, W and top), W against QCD AUC with 1 000 labels: random PFN encoder 0.860, JetCLR PFN
 after 3 epochs 0.902; with all labels the gain over the random encoder is only 0.015-0.03. On the toy (W against QCD, 1
@@ -243,7 +254,19 @@ than 0.03 below the toy value, check the augmentations first.
 ## Masked particle modelling
 
 Masked particle modelling (2401.13537, 2409.12589) is the BERT-like alternative (1810.04805): hide a fraction of the
-particles (`itj.ssl.mask_particles(batch, frac=0.3)` replaces their features by zeros and returns the targets and the
-mask) and train the encoder to predict the hidden features (for example $\ln p_T$, $\Delta\eta$, $\Delta\phi$ with a
-regression loss). The particles have no natural order, so the targets must be matched to the masked slots (in $p_T$
-order, as stored). Evaluate the encoder with the linear evaluation above.
+particles and train the encoder to predict the hidden features (for example $\ln p_T$, $\Delta\eta$, $\Delta\phi$ with a
+regression loss). `itj.ssl.mask_particles(batch, frac=0.3)` replaces their features by zeros and returns the targets
+and the mask. The particles have no natural order and ParT without pair features has no positional information: every
+masked slot of a jet gets the same input and therefore the same output, and a regression head on that output alone
+can only predict the mean of the hidden particles. The decoder has to know which particle it predicts:
+`itj.ssl.MaskedParticleDecoder` adds a learned embedding of the slot (the $p_T$ rank, as stored) to the encoder output
+before a small head, so that the encoder itself has to infer the hidden particles from the visible ones (a set loss
+that matches predictions to targets without an order is the alternative). With `num_layers > 0` it is the decoder of a
+masked autoencoder (2111.06377), for `mask_particles(..., drop=True)`, which removes the masked particles from the
+encoder input: a learned mask token at each masked slot attends to the encoded visible particles, and the decoder then
+does part of the inference itself. Compare the masked loss with trivial predictors: the mean of the visible particles
+of the jet and, for $\ln p_T$, the mean of the visible rank neighbours of the slot, which the $p_T$ order makes almost
+free; the angles are the hard part. A regression predicts the conditional mean of each target; the papers predict
+discrete tokens of the hidden particles (2401.13537) or compare such targets with continuous ones and generative heads
+(2409.12589). Evaluate the encoder with the linear evaluation above, on the class token and on the mean of the last
+particle block: the masked loss never trains the class-attention blocks.

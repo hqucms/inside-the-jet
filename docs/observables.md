@@ -264,6 +264,16 @@ on log axes: an IRC-safe quantity falls linearly to zero, an unsafe one stays at
   `part_deta`; `keep_sign=True` keeps the sign of the unperturbed jet (`irc_scan` does this).
 - **Zero denominators.** $|\Delta O|/O$ is infinite for a jet with $O = 0$ (about 0.2 % of the detector-level jets
   have $m_\mathrm{SD} = 0$): leave such jets out, or plot the median of $|\Delta O|/O$ as well.
+- **Soft drop below $z_\mathrm{cut}$.** For $\lambda \le z_\mathrm{cut} = 0.1$ the two pieces of a particle fail the
+  soft-drop condition against each other. A jet that soft drop grooms down to one massive hadron then loses the softer
+  piece, and its $m_\mathrm{SD}$ falls by about the fraction $\lambda$ at any $\delta$: a few jets in a thousand give
+  a plateau of the mean. The hadron masses cause it; for massless particles soft drop is collinear safe. Scan
+  $m_\mathrm{SD}$ with $\lambda > z_\mathrm{cut}$ (T1.6 uses 0.5 and 0.2).
+- **Float32 pieces.** The files store float32 four-momenta. Rounded one by one, the pieces $\lambda p$ and
+  $(1 - \lambda)p$ of a TeV particle each get a spurious mass of order 0.1 GeV for $\lambda \ne 0.5$, enough to change
+  the groomed mass of a jet whose soft-drop core is one or two particles. `split_collinear` therefore returns the new
+  four-momenta in float64 (`float64=False` for the float32 behaviour; `irc_scan` and `JetCLRAugment` use float32,
+  since the networks read float32 anyway).
 
 ## Chunking and memory
 

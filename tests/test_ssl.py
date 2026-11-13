@@ -12,6 +12,7 @@ import torch
 from itj.data import JetData
 from itj.ssl import (
     JetCLRAugment,
+    MaskedParticleDecoder,
     ProjectionHead,
     alignment,
     linear_eval,
@@ -182,6 +183,67 @@ def test_mask_particles(jetclass_sample: JetData) -> None:
                 assert torch.all(masked.vectors[j, :, slot] == 0)
     with pytest.raises(ValueError, match="frac"):
         mask_particles(batch, frac=0.0)
+
+
+def test_mask_particles_drop(jetclass_sample: JetData) -> None:
+    from itj.features import make_batch
+
+    batch = make_batch(jetclass_sample.head(20), "kin", label_set=None)
+    real = batch.particle_mask
+    masked, targets, which = mask_particles(batch, frac=0.3, generator=torch.Generator().manual_seed(1), drop=True)
+    assert torch.equal(masked.particle_mask, real & ~which)
+    assert (masked.particle_mask.sum(1) >= 1).all()
+    torch.testing.assert_close(targets, batch.features)
+    # the same particles as without drop (same generator state)
+    _, _, same = mask_particles(batch, frac=0.3, generator=torch.Generator().manual_seed(1))
+    assert torch.equal(same, which)
+    # every particle of a jet would be masked with frac=1: one stays visible
+    _, _, all_but_one = mask_particles(batch, frac=1.0, drop=True)
+    assert torch.equal(all_but_one.sum(1), real.sum(1) - 1)
+
+
+@pytest.mark.parametrize(("num_layers", "drop"), [(0, False), (1, True)])
+def test_masked_particle_decoder_knows_the_slot(jetclass_sample: JetData, num_layers: int, drop: bool) -> None:
+    from itj.features import make_batch
+    from itj.models import build_model
+
+    torch.manual_seed(0)
+    model = build_model("partsmall_nopair")
+    batch = make_batch(jetclass_sample.head(16), "kin", label_set=None)
+    mb, _, which = mask_particles(batch, frac=0.3, generator=torch.Generator().manual_seed(0), drop=drop)
+    model.eval()
+    h = model.trace(mb).layers["block2"]
+    jet = int(torch.argmax(which.sum(1)))
+    slots = torch.nonzero(which[jet]).squeeze(1)
+    assert len(slots) > 1
+    if not drop:  # without position the encoder gives every masked slot of a jet the same output
+        assert (h[jet, slots] - h[jet, slots[0]]).abs().amax() < 1e-4
+    dec = MaskedParticleDecoder(h.shape[-1], 3, num_layers=num_layers)
+    assert (dec.layers is None) == (num_layers == 0)
+    pred = dec(h, batch.particle_mask, which)
+    assert pred.shape == (*which.shape, 3)
+    assert (pred[jet, slots] - pred[jet, slots[0]]).abs().amax() > 1e-4  # the decoder tells them apart
+    # gradients reach the encoder
+    pred[which].square().mean().backward()
+    assert any(p.grad is not None and float(p.grad.abs().sum()) > 0 for p in model.parameters())
+    # a decoder alone learns a target that depends only on the slot, which a head without the slot cannot
+    torch.manual_seed(1)
+    dec = MaskedParticleDecoder(8, 1, dim=16, num_heads=2, num_layers=num_layers)
+    opt = torch.optim.Adam(dec.parameters(), lr=3e-3)
+    real = torch.ones(32, 12, dtype=torch.bool)
+    for _ in range(150):
+        which = torch.rand(32, 12) < 0.3
+        h = torch.where(which[..., None], torch.zeros(32, 12, 8), torch.randn(32, 12, 8))
+        target = torch.linspace(-1, 1, 12).expand(32, 12)
+        loss = ((dec(h, real, which)[..., 0] - target)[which] ** 2).mean()
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    assert float(loss.detach()) < 0.05 * float(target.var())
+    with pytest.raises(ValueError, match="max_len"):
+        dec(torch.zeros(1, 200, 8), torch.ones(1, 200, dtype=torch.bool), torch.zeros(1, 200, dtype=torch.bool))
+    with pytest.raises(ValueError, match="num_layers"):
+        MaskedParticleDecoder(8, num_layers=-1)
 
 
 # ---------------------------------------------------------------------------------------------------- linear evaluation

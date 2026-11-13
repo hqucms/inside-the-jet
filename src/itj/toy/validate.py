@@ -25,6 +25,7 @@ from ..data import COLUMNS, JETCLASS_LABELS, JetData, Ragged
 from .shower import CA, CF, TR
 
 __all__ = [
+    "N_LUND_MIN",
     "N_SIGMA_WINDOW",
     "REL_WINDOW",
     "ROWS",
@@ -546,6 +547,11 @@ N_SIGMA_WINDOW = 5.0
 #: ... or within this relative distance, whichever is larger.
 REL_WINDOW = 0.03
 
+#: Smallest number of jets of the two Lund samples (rows ``lund_*``, ``n_primary_q`` and ``mass_peak_*``, about a second
+#: each): the parabola fit of the broad mass peaks is unstable on fewer jets (at 3 000 jets ``mass_peak_q`` can land
+#: 4 errors from its calibrated value).
+N_LUND_MIN = 10_000
+
 
 def _window(name: str, error: float) -> tuple[float, float]:
     """Return the test window of a row for a run with this statistical error."""
@@ -642,7 +648,8 @@ def validate(
     Parameters
     ----------
     n : int
-        Jets per sample (the detector sample has ``n`` jets of qcd, wqq and tbqq together).
+        Jets per sample (the detector sample has ``n`` jets of qcd, wqq and tbqq together); the two Lund samples
+        (shower only) have at least :data:`N_LUND_MIN`.
     seed : int
         Seed of every sample.
     workers : int or "auto"
@@ -670,8 +677,9 @@ def validate(
     gen: dict[str, Any] = {"seed": seed, "workers": workers}
     if need("lund", "n_primary", "mass_peak"):
         lund_cfg = preset("shower", alphas_mode="fixed", alphas_value=0.12, pt_spectrum="fixed", pt_fixed=600.0)
-        q = generate(n, config=lund_cfg, processes=("q",), **gen)
-        g = generate(n, config=lund_cfg, processes=("g",), **gen)
+        n_lund = max(n, N_LUND_MIN)
+        q = generate(n_lund, config=lund_cfg, processes=("q",), **gen)
+        g = generate(n_lund, config=lund_cfg, processes=("g",), **gen)
         (lq, eq), (lg, eg) = _lund_box(q), _lund_box(g)
         values["lund_q"] = _row("lund_q", lq, eq)
         values["lund_g"] = _row("lund_g", lg, eg)

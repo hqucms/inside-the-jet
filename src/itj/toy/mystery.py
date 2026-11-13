@@ -5,7 +5,9 @@ feature that a tagger can learn although it has nothing to do with the physics o
 one of :data:`SHORTCUTS` from the seed, generates the file with it as a per-process override and stores the choice
 only in ``provenance["mystery"]``, scrambled (JSON XORed with a SHA-256 stream of the key, then base64): it is not
 in the stored configuration, not in ``provenance["process_overrides"]``, not in ``jetgen info`` (``--provenance``
-prints a placeholder) and cannot be read with a base64 decoder. :func:`reveal` unscrambles it
+prints a placeholder) and cannot be read with a base64 decoder. The run statistics that a shortcut changes
+(:data:`RUN_STATISTICS`: the containment efficiency of ``hard_w``, the capped kT fraction of ``wide_top``, the stage
+times of ``busy_w``) go into the scrambled entry as well (:func:`plant`). :func:`reveal` unscrambles it
 (``jetgen info --reveal``).
 
 The scrambling is not encryption. Reading this module spoils T7.2: the mapping from the seed to the shortcut and
@@ -28,7 +30,7 @@ import numpy as np
 
 from ..data import JetData
 
-__all__ = ["HIDDEN", "SHORTCUTS", "decode", "encode", "hide", "mystery_overrides", "reveal"]
+__all__ = ["HIDDEN", "RUN_STATISTICS", "SHORTCUTS", "decode", "encode", "hide", "mystery_overrides", "plant", "reveal"]
 
 #: The planted shortcuts: (name, process, configuration field, value). The strengths are calibrated so that a PFN
 #: (``kin`` features, 10 epochs on 42 000 jets) gains 1.5-3 % of test accuracy from the shortcut (QCD/W/top accuracy
@@ -45,10 +47,16 @@ SHORTCUTS: tuple[tuple[str, str, str, object], ...] = (
 #: Environment variable with the instructor's key (an integer; default 0, the public mapping).
 KEY_VARIABLE = "ITJ_MYSTERY_KEY"
 
-#: What ``jetgen info --provenance`` prints in place of the scrambled entry.
+#: What ``jetgen info --provenance`` prints in place of the scrambled entry (and what a mystery file stores in place of
+#: its :data:`RUN_STATISTICS`).
 HIDDEN = "<hidden: jetgen info --reveal>"
 
-#: Prefix of a scrambled entry (files of itj 0.1.0 hold plain base64 of JSON, which :func:`decode` still reads).
+#: Provenance entries that a planted shortcut changes without any physics analysis; a mystery file keeps them only in
+#: the scrambled entry.
+RUN_STATISTICS = ("containment_efficiency", "hadron_kt_capped", "stage_times_s")
+
+#: Prefix of a scrambled entry (files written before the scrambling, itj 0.1.0 of 2026-11-05, hold plain base64 of JSON,
+#: which :func:`decode` still reads).
 _SCRAMBLED = "x1:"
 
 
@@ -97,12 +105,44 @@ def _scramble(raw: bytes, key: int) -> bytes:
     return bytes(a ^ b for a, b in zip(raw, stream[: len(raw)], strict=True))
 
 
-def encode(seed: int) -> str:
-    """Return the ``provenance["mystery"]`` entry of a mystery file of this seed (scrambled JSON, see the module)."""
+def encode(seed: int, statistics: Mapping[str, Any] | None = None) -> str:
+    """Return the ``provenance["mystery"]`` entry of a mystery file of this seed (scrambled JSON, see the module).
+
+    ``statistics`` (the :data:`RUN_STATISTICS` of the run) are scrambled with the shortcut.
+    """
     name, process, field, value = SHORTCUTS[_index(int(seed))]
-    payload = {"name": name, "process": process, "field": field, "value": value, "key_set": _key() != 0}
+    payload: dict[str, Any] = {"name": name, "process": process, "field": field, "value": value, "key_set": _key() != 0}
+    if statistics:
+        payload["statistics"] = dict(statistics)
     raw = _scramble(json.dumps(payload, sort_keys=True).encode(), _key())
     return _SCRAMBLED + base64.b64encode(raw).decode("ascii")
+
+
+def plant(provenance: Mapping[str, Any], seed: int) -> dict[str, Any]:
+    """Return the provenance of a mystery file of this seed, made from the provenance of its run.
+
+    The planted override is removed (``process_overrides``), the :data:`RUN_STATISTICS` are replaced by
+    :data:`HIDDEN` and the shortcut and those statistics are stored scrambled in ``"mystery"``: the visible provenance
+    is then that of a clean file of the same seed, up to ``command_line``, ``created`` and ``wall_time_s``.
+
+    Parameters
+    ----------
+    provenance : mapping
+        The provenance of the run (``itj.toy.generate`` with the planted ``process_overrides``).
+    seed : int
+        The run seed.
+
+    Returns
+    -------
+    dict
+    """
+    out = dict(provenance)
+    out.pop("process_overrides", None)
+    statistics = {key: out[key] for key in RUN_STATISTICS if key in out}
+    for key in statistics:
+        out[key] = HIDDEN
+    out["mystery"] = encode(seed, statistics)
+    return out
 
 
 def decode(text: str) -> dict[str, Any]:
@@ -164,7 +204,8 @@ def reveal(path_or_data: str | os.PathLike[str] | JetData) -> str:
     Returns
     -------
     str
-        One line per planted shortcut, or ``"this file has no planted shortcut"``.
+        One line per planted shortcut (followed by an indented line with its hidden run statistics, for files of
+        itj 0.1.1 and later), or ``"this file has no planted shortcut"``.
     """
     if isinstance(path_or_data, JetData):
         provenance = path_or_data.provenance
@@ -186,4 +227,6 @@ def reveal(path_or_data: str | os.PathLike[str] | JetData) -> str:
             f"planted shortcut {p['name']!r}: the {p['process']} jets were generated with {p['field']} = "
             f"{p['value']!r} (default {default!r}); every other process is unchanged jet by jet"
         )
+        if p.get("statistics"):
+            lines.append("  hidden run statistics: " + json.dumps(p["statistics"], sort_keys=True))
     return "\n".join(lines)

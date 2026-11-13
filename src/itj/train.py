@@ -101,6 +101,8 @@ class History:
         ``wall_time_s[-1]`` is the total time.
     jets_per_s : list of float
         Training jets per second of the epoch (forward, backward and data handling; validation excluded).
+    steps : list of int
+        Optimiser steps done since the start of :func:`fit` at the end of each epoch.
     best_epoch : int
         Epoch (0-based) whose state the model holds at the end: lowest validation loss, or the last epoch without
         validation data (-1 before the first epoch).
@@ -112,6 +114,7 @@ class History:
     val_acc: list[float] = field(default_factory=list)
     wall_time_s: list[float] = field(default_factory=list)
     jets_per_s: list[float] = field(default_factory=list)
+    steps: list[int] = field(default_factory=list)
     best_epoch: int = -1
 
     def to_dict(self) -> dict[str, Any]:
@@ -244,6 +247,7 @@ def fit(
     threads: int | None = None,
     max_minutes: float | None = None,
     patience: int | None = None,
+    val_every: int | None = None,
     log_every: int = 50,
     callback: Callable[[int, History], None] | None = None,
     quiet: bool = False,
@@ -259,8 +263,8 @@ def fit(
         (``make_loader(train, batch_size, seed=seed)``); an iterable of batches is used as it is (a generator is
         read into a list first).
     val : JetDataset or iterable of JetBatch, optional
-        Validation jets, evaluated after every epoch; the state with the lowest validation loss is restored at the
-        end. None: no validation, the final state is kept.
+        Validation jets, evaluated after every epoch (or as ``val_every`` says); the state with the lowest validation
+        loss is restored at the end. None: no validation, the final state is kept.
     epochs : int
         Number of passes over ``train``.
     batch_size : int
@@ -278,8 +282,10 @@ def fit(
         Plan at least this many optimiser steps: ``epochs`` (and with it the length of the cosine schedule) is
         raised to ``ceil(min_steps * batch_size / n_train)`` (``ceil(min_steps / batches per epoch)`` for an
         iterable) when that is larger, so that a small training set gets enough epochs. ``patience`` and
-        ``max_minutes`` can still stop the run earlier: with ``patience`` a small set stops at its best validation
-        loss, often after a few hundred steps.
+        ``max_minutes`` can still stop the run earlier. ``patience`` counts validations, by default one per epoch:
+        an epoch of 1 000 jets is only 4 steps of 256, so ``patience=5`` alone stops such a set after a few dozen
+        steps. Give a small set ``val_every`` as well (``min_steps=2000, val_every=50, patience=5``: stop after 250
+        steps without improvement).
     loss : callable, optional
         ``loss(model, batch) -> scalar tensor`` replacing the default cross entropy (weighted by ``batch.weight``
         when the batch has weights: ``sum_i w_i CE_i / sum_i w_i``); the accuracies are then NaN in training.
@@ -293,7 +299,15 @@ def fit(
     max_minutes : float, optional
         Stop after this many minutes of wall time (checked after every batch; the partial epoch is recorded).
     patience : int, optional
-        Stop when the validation loss has not improved for this many epochs.
+        Stop when the validation loss has not improved for this many validations in a row (epochs, unless
+        ``val_every`` is given).
+    val_every : int, optional
+        Validate after the first epoch that ends at least this many optimiser steps after the previous validation,
+        instead of after every epoch, and always after the last epoch (also when ``max_minutes`` stops the run). For
+        small training sets, whose epochs are a few steps: it makes ``patience`` a number of steps
+        (at least ``patience * val_every``) and saves the time of the validations. The epochs without validation have
+        NaN ``val_loss`` and ``val_acc`` in the :class:`History`, and the epoch line is printed only at a validation
+        (without ``val``, on the same schedule). None: after every epoch.
     log_every : int
         Print the running training loss every ``log_every`` batches (0: never).
     callback : callable, optional
@@ -314,6 +328,10 @@ def fit(
     """
     if epochs < 1:
         raise ValueError(f"epochs must be >= 1, got {epochs}")
+    if val_every is not None and val_every < 1:
+        raise ValueError(f"val_every must be >= 1, got {val_every}")
+    if patience is not None and patience < 1:
+        raise ValueError(f"patience must be >= 1, got {patience}")
     if scheduler not in ("cosine", "none"):
         raise ValueError(f"unknown scheduler {scheduler!r}; choose from cosine, none")
     _check_compatible(model, train, "training")
@@ -348,6 +366,7 @@ def fit(
         start = time.perf_counter()
         deadline = None if max_minutes is None else start + 60.0 * max_minutes
         step = 0
+        last_check = 0  # optimiser step of the last validation (or epoch line, without validation data)
         stop = False
         for epoch in range(epochs):
             model.train()
@@ -392,7 +411,13 @@ def fit(
             history.train_loss.append(sum_loss / n_jets if n_jets else math.nan)
             history.train_acc.append(n_correct / n_labelled if n_labelled else math.nan)
             history.jets_per_s.append(n_jets / train_time if train_time > 0 else math.nan)
-            if val_batches is not None:
+            history.steps.append(step)
+            due = val_every is None or step - last_check >= val_every or stop or epoch == epochs - 1
+            if due:
+                last_check = step
+            validate = due and val_batches is not None
+            if validate:
+                assert val_batches is not None
                 v_loss, v_acc = _evaluate(model, val_batches, loss, device)
             else:
                 v_loss, v_acc = math.nan, math.nan
@@ -401,22 +426,25 @@ def fit(
             history.wall_time_s.append(time.perf_counter() - start)
             if val_batches is None:
                 history.best_epoch = epoch
-            elif v_loss < best_loss:
-                best_loss, since_best = v_loss, 0
-                history.best_epoch = epoch
-                best_state = copy.deepcopy(model.state_dict())
-            else:
-                since_best += 1
-            _say(
-                quiet,
-                f"epoch {epoch + 1}/{epochs}: train loss {history.train_loss[-1]:.4f} acc {history.train_acc[-1]:.4f}"
-                f" | val loss {v_loss:.4f} acc {v_acc:.4f} | {history.jets_per_s[-1]:,.0f} jets/s, "
-                f"{history.wall_time_s[-1]:.1f} s",
-            )
+            elif validate:
+                if v_loss < best_loss:
+                    best_loss, since_best = v_loss, 0
+                    history.best_epoch = epoch
+                    best_state = copy.deepcopy(model.state_dict())
+                else:
+                    since_best += 1
+            if due:
+                _say(
+                    quiet,
+                    f"epoch {epoch + 1}/{epochs} (step {step}): train loss {history.train_loss[-1]:.4f} acc "
+                    f"{history.train_acc[-1]:.4f} | val loss {v_loss:.4f} acc {v_acc:.4f} | "
+                    f"{history.jets_per_s[-1]:,.0f} jets/s, {history.wall_time_s[-1]:.1f} s",
+                )
             if callback is not None:
                 callback(epoch, history)
-            if patience is not None and since_best >= patience:
-                _say(quiet, f"no improvement of the validation loss for {patience} epochs: stopping")
+            if patience is not None and validate and since_best >= patience:
+                what = "validations" if val_every is not None else "epochs"
+                _say(quiet, f"no improvement of the validation loss for {patience} {what} (step {step}): stopping")
                 stop = True
             if stop:
                 break
