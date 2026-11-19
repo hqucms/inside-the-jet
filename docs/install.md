@@ -28,8 +28,9 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-If `python` is not found, use `py` instead. Every `jetgen` command of [TASKS.md](../TASKS.md) is a single line and
-works in any shell; `python examples/make_task_data.py --week 1` (to `--week 4`) makes the data sets of each week.
+If `python` is not found, use `py` instead. Every `jetgen` command of the course ([TASKS.md](../TASKS.md) and its week
+files) is a single line and works in any shell; `python examples/make_task_data.py --week 1` (to `--week 4`) makes the
+data sets of each week.
 The weaver commands of [examples/weaver](../examples/weaver/README.md) are given for bash and for the Command Prompt
 (which needs double quotes: `--gpus ""`). [WSL](https://learn.microsoft.com/windows/wsl/) gives a Linux shell on
 Windows if you prefer bash.
@@ -60,7 +61,7 @@ the driver supports in its header. Install the build for
 that CUDA major version, e.g. `--index-url https://download.pytorch.org/whl/cu126` for CUDA 12 or `cu130` for
 CUDA 13. The [PyTorch selector](https://pytorch.org/get-started/locally/) lists the current builds. A CUDA build takes
 several GB: put the environment on a file system with enough space. A GPU is never needed for the core questions; the
-parts marked *Optional (GPU)* in TASKS.md run faster with one.
+parts marked *Optional (GPU)* in the week files run faster with one.
 
 **Macs with an Intel processor.** PyTorch 2.2.2 is the last release for them (Python 3.10 to 3.12) and it needs
 NumPy 1:
@@ -71,7 +72,7 @@ python -m pip install -e ".[analysis,dev]" "numpy<2"
 ```
 
 weaver 0.5.4 needs NumPy 2.1.1 or newer, so the `weaver` extra does not install on Intel Macs: do question `W4.2.7`
-with `itj` only, as TASKS.md says.
+with `itj` only, as [week 4](../tasks/week4.md) says.
 
 **Apple Silicon.** The default PyPI build works and includes MPS (the GPU of the Mac). `itj` runs on the CPU unless you
 pass `device="mps"`. weaver selects MPS by itself when it is asked for the CPU (`--gpus ''`). Some operations of ParT
@@ -108,10 +109,10 @@ The README registers the environment as the Jupyter kernel `Python (inside-the-j
 ask for that kernel by name, so JupyterLab, VS Code and JupyterHub pick it up. `python -m jupyter lab`, run in the
 activated environment, starts JupyterLab from this environment (a bare `jupyter` may belong to another Python
 installation). Start it from the repository root and keep your own notebooks and scripts there. Then the paths
-`data/...` and `models/...` of TASKS.md work as written. A notebook inside `notebooks/` runs in that folder and reads
-`../data/...`. If a notebook reports `ModuleNotFoundError: No module named 'itj'` or `'torch'`, it runs on another
-kernel: choose `Python (inside-the-jet)` in the kernel menu (JupyterLab: Kernel > Change Kernel; VS Code: the kernel
-picker in the top right). In VS Code, open the repository folder itself, so that it finds `.venv`.
+`data/...` and `models/...` of the week files in `tasks/` work as written. A notebook inside `notebooks/` runs in that
+folder and reads `../data/...`. If a notebook reports `ModuleNotFoundError: No module named 'itj'` or `'torch'`, it runs
+on another kernel: choose `Python (inside-the-jet)` in the kernel menu (JupyterLab: Kernel > Change Kernel; VS Code: the
+kernel picker in the top right). In VS Code, open the repository folder itself, so that it finds `.venv`.
 
 ## Optional: weaver
 

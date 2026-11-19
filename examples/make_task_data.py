@@ -1,8 +1,9 @@
-"""Make the data sets of TASKS.md (the blocks "Data for week 1" to "Data for week 4") on any operating system.
+"""Make the data sets of the course (the blocks "Data for week 1" to "Data for week 4") on any operating system.
 
-The commands are read from the bash blocks under the four headings "Data for week ..." of TASKS.md, so the script and
-the task sheet cannot disagree, and run through the entry point of the command line interface (``itj.toy.cli.main``),
-so they write the same files as the commands typed by hand. Run it from anywhere inside the repository::
+The commands are read from the bash blocks under the headings "Data for week k" of the week files tasks/week1.md to
+tasks/week4.md, so the script and the questions cannot disagree, and run through the entry point of the command line
+interface (``itj.toy.cli.main``), so they write the same files as the commands typed by hand. Run it from anywhere
+inside the repository::
 
     python examples/make_task_data.py --week 1            # the toy files of week 1; files that exist are kept
     python examples/make_task_data.py --week 4 --only fetch   # start the downloads of week 4 (at the start of week 3)
@@ -31,35 +32,45 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]  # the repository root: every path of TASKS.md is relative to it
-TASKS = ROOT / "TASKS.md"
+ROOT = Path(__file__).resolve().parents[1]  # the repository root: every path of the week files is relative to it
+TASKS_DIR = ROOT / "tasks"  # the week files week1.md to week4.md (and bonus.md, whose data the week-4 block makes)
 WEEKS = ("1", "2", "3", "4")
-HEADINGS = {week: f"### Data for week {week}" for week in WEEKS}
+HEADINGS = {week: f"## Data for week {week}" for week in WEEKS}
 SPLIT_PARTS = ("train", "val", "test")
 
 
-def _block(lines: list[str], heading: str, tasks: Path) -> list[str]:
-    """Return the lines of the first bash block after ``heading``."""
+def week_file(week: str, tasks: Path = TASKS_DIR) -> Path:
+    """Return the file of week ``week`` (``tasks/week<k>.md``) that holds the block "Data for week k"."""
+    return tasks / f"week{week}.md"
+
+
+def _block(path: Path, heading: str) -> list[str]:
+    """Return the lines of the first bash block after ``heading`` in ``path``."""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        raise RuntimeError(f"{path} is missing: it holds the block {heading!r}") from None
     try:
         start = lines.index(heading)
     except ValueError:
-        raise RuntimeError(f"{tasks} has no heading {heading!r}") from None
+        raise RuntimeError(f"{path} has no heading {heading!r}") from None
     fence = next((k for k in range(start, len(lines)) if lines[k].strip() == "```bash"), None)
     if fence is None:
-        raise RuntimeError(f"{tasks} has no bash block after {heading!r}")
+        raise RuntimeError(f"{path} has no bash block after {heading!r}")
     end = next(k for k in range(fence + 1, len(lines)) if lines[k].strip() == "```")
     return lines[fence + 1 : end]
 
 
-def task_commands(tasks: Path = TASKS, week: str = "all") -> list[list[str]]:
-    """Return the ``jetgen`` commands of the data blocks of TASKS.md, in order, without the leading ``jetgen``.
+def task_commands(tasks: Path = TASKS_DIR, week: str = "all") -> list[list[str]]:
+    """Return the ``jetgen`` commands of the data blocks of the week files, in order, without the leading ``jetgen``.
 
     Parameters
     ----------
     tasks : pathlib.Path
-        The task sheet.
+        The folder of the week files (``tasks/`` of the repository).
     week : {"1", "2", "3", "4", "all"}
-        The block of one week ("Data for week 1" to "Data for week 4") or all four, in order.
+        The block of one week ("Data for week 1" in tasks/week1.md to "Data for week 4" in tasks/week4.md) or all
+        four, in order.
 
     Returns
     -------
@@ -68,15 +79,15 @@ def task_commands(tasks: Path = TASKS, week: str = "all") -> list[list[str]]:
     """
     if week not in (*HEADINGS, "all"):
         raise ValueError(f"week must be 1, 2, 3, 4 or all, got {week!r}")
-    lines = tasks.read_text(encoding="utf-8").splitlines()
     commands = []
     for key in HEADINGS if week == "all" else (week,):
-        for line in _block(lines, HEADINGS[key], tasks):
+        path = week_file(key, tasks)
+        for line in _block(path, HEADINGS[key]):
             words = shlex.split(line, comments=True)
             if not words:
                 continue
             if words[0] != "jetgen":
-                raise RuntimeError(f"unexpected line in the data block of {tasks}: {line!r}")
+                raise RuntimeError(f"unexpected line in the data block of {path}: {line!r}")
             commands.append(words[1:])
     return commands
 
@@ -97,7 +108,7 @@ def output_of(command: Sequence[str]) -> list[Path]:
     raise ValueError(f"output_of is only defined for generate, merge and split, not {command[0]!r}")
 
 
-def block_for(path: str | Path, tasks: Path = TASKS) -> str | None:
+def block_for(path: str | Path, tasks: Path = TASKS_DIR) -> str | None:
     """Return the options of this script that make ``path`` (relative to the repository root), or None.
 
     ``"--week k"`` for a file that a ``generate``, ``merge`` or ``split`` line of week k writes; ``"--week k --only
@@ -137,7 +148,7 @@ def _inputs_of(command: Sequence[str]) -> list[Path]:
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Read the command-line options."""
     parser = argparse.ArgumentParser(
-        description="Make the data sets of TASKS.md (weeks 1 to 4) on any operating system."
+        description="Make the data sets of the course (tasks/week1.md to tasks/week4.md) on any operating system."
     )
     parser.add_argument(
         "--week", choices=(*WEEKS, "all"), default="all", help="the data block of one week (default: all four)"
@@ -156,12 +167,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the commands of the data blocks; return the exit status of the first command that fails, else 0."""
     args = parse_args(argv)
     os.chdir(ROOT)
-    commands = task_commands(TASKS, args.week)
+    commands = task_commands(TASKS_DIR, args.week)
     if args.skip_fetch:
         commands = [c for c in commands if c[0] != "fetch"]
     if args.only:
         commands = [c for c in commands if args.only in "jetgen " + shlex.join(c)]
-    print(f"{len(commands)} data sets for TASKS.md, written to {ROOT / 'data'}")
+    which = "tasks/week1.md to tasks/week4.md" if args.week == "all" else f"tasks/week{args.week}.md"
+    print(f"{len(commands)} data sets for {which}, written to {ROOT / 'data'}")
     if args.dry_run:
         for command in commands:
             print("jetgen " + shlex.join(command))
@@ -181,8 +193,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 continue
             missing = [p for p in _inputs_of(command) if not p.exists()]
             if missing:
-                block = block_for(missing[0], TASKS)
-                how = f"python examples/make_task_data.py {block}" if block else "see the data blocks of TASKS.md"
+                block = block_for(missing[0], TASKS_DIR)
+                how = f"python examples/make_task_data.py {block}" if block else "see the data blocks in tasks/"
                 print(f"{missing[0]} is missing for: {line}\n(make it first: {how})", file=sys.stderr)
                 return 1
             if args.overwrite or any(present):  # a split interrupted half way is made again

@@ -1,4 +1,4 @@
-"""The question IDs cited outside TASKS.md (README, docs, CHANGELOG, notebooks, examples, src) exist in TASKS.md.
+"""The question IDs cited outside the week files (README, docs, CHANGELOG, notebooks, examples, src) exist there.
 
 Release 0.2.0 renumbered the questions (``T1.3`` became ``W1.2.4`` and others; docs/id_mapping_0.2.md). An ID of
 0.1.x left in a document or a help string points a student to the wrong question, so none may remain outside the
@@ -12,12 +12,12 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-TASKS = ROOT / "TASKS.md"
+from helpers import ROOT, TASKS, WEEK_FILES, week_files_text
+
 MAPPING = ROOT / "docs" / "id_mapping_0.2.md"
 GLOSSARY = ROOT / "docs" / "glossary.md"
 
-pytestmark = pytest.mark.skipif(not TASKS.exists(), reason="needs the repository checkout")
+pytestmark = pytest.mark.skipif(not all(p.exists() for p in WEEK_FILES), reason="needs the repository checkout")
 
 #: A question (``W1.2.4``) or task (``W1.2``) of 0.2.0; a bonus question ``B.1`` to ``B.5``.
 NEW_ID = re.compile(r"(?<![\w.])(W[1-4]\.\d(?:\.\d{1,2})?|B\.\d{1,2})(?![\w]|\.\d)")
@@ -29,8 +29,8 @@ OLD_RANGE = re.compile(r"\(?T0\.1(?: to |-)T7\.4\)?")
 
 @cache
 def _known() -> set[str]:
-    """Every question and task ID of TASKS.md."""
-    text = TASKS.read_text(encoding="utf-8")
+    """Every question and task ID of the week files."""
+    text = week_files_text()
     questions = set(re.findall(r"^\*\*(W[1-4]\.\d\.\d{1,2}|B\.\d)\*\*", text, flags=re.MULTILINE))
     return questions | {q.rsplit(".", 1)[0] for q in questions if q.startswith("W")}
 
@@ -50,7 +50,12 @@ def _notebook_text(path: Path) -> str:
 @cache
 def _documents() -> dict[str, str]:
     """The texts that cite question IDs, by their path relative to the repository root."""
-    files = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md")), *sorted((ROOT / "examples").rglob("*.md"))]
+    files = [
+        ROOT / "README.md",
+        TASKS,
+        *sorted((ROOT / "docs").glob("*.md")),
+        *sorted((ROOT / "examples").rglob("*.md")),
+    ]
     files += sorted((ROOT / "examples").rglob("*.py")) + sorted((ROOT / "src" / "itj").rglob("*.py"))
     out = {
         p.relative_to(ROOT).as_posix(): p.read_text(encoding="utf-8")
@@ -74,7 +79,7 @@ def test_cited_ids_exist():
         for match in NEW_ID.finditer(text):
             if match.group(1) not in _known():
                 unknown.append(f"{name}:{_where(text, match.start())}: {match.group(1)}")
-    assert not unknown, "IDs that TASKS.md does not have:\n" + "\n".join(unknown)
+    assert not unknown, "IDs that the week files do not have:\n" + "\n".join(unknown)
 
 
 def test_no_old_ids_left():

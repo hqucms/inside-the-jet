@@ -1,4 +1,4 @@
-"""Statistical helpers and common checks of the test suite."""
+"""Statistical helpers, common checks and the task files of the test suite."""
 
 from __future__ import annotations
 
@@ -7,10 +7,24 @@ import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import cache
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pytest
+
+#: The repository root, the entry page of the course and its week files in the order of the course (tasks/).
+ROOT = Path(__file__).resolve().parents[1]
+TASKS = ROOT / "TASKS.md"
+WEEK_FILES = tuple(ROOT / "tasks" / f"{name}.md" for name in ("week1", "week2", "week3", "week4", "bonus"))
+
+
+@cache
+def week_files_text() -> str:
+    """The text of every week file, in the order of the course (where the question IDs and the data blocks are)."""
+    return "\n".join(path.read_text(encoding="utf-8") for path in WEEK_FILES)
+
 
 #: Tolerance of the statistical checks in standard deviations (the tests must pass for any seed and platform: a
 #: correct implementation fails a 5 sigma check with probability 6e-7 per check).

@@ -1,11 +1,14 @@
-"""TASKS.md and the documents: question IDs, tiers, times, the week structure, data files, links and anchors.
+"""TASKS.md, the week files and the documents: question IDs, tiers, times, the week structure, data, links, anchors.
 
-The question IDs of release 0.2.0 are ``W<week>.<task>.<question>`` and ``B.1`` to ``B.5``; a question starts a line
-as ``**W1.1.3** *Core, 90 min.* Title``. docs/id_mapping_0.2.md maps the IDs of 0.1.x (tests/test_question_ids.py).
+TASKS.md is the entry page of the course (the rules, the hand-in, the notation and a table of the weeks); the questions
+are in one file per week, tasks/week1.md to tasks/week4.md and tasks/bonus.md. The question IDs of release 0.2.0 are
+``W<week>.<task>.<question>`` and ``B.1`` to ``B.5``; a question starts a line as ``**W1.1.3** *Core, 90 min.* Title``.
+docs/id_mapping_0.2.md maps the IDs of 0.1.x (tests/test_question_ids.py).
 """
 
 import fnmatch
 import importlib.util
+import json
 import re
 import types
 from functools import cache
@@ -13,14 +16,19 @@ from pathlib import Path
 
 import pytest
 
+from helpers import ROOT, TASKS, WEEK_FILES, week_files_text
 from itj.jetclass import MANIFEST, class_names
 
-ROOT = Path(__file__).resolve().parents[1]
-TASKS = ROOT / "TASKS.md"
 SCRIPT = ROOT / "examples" / "make_task_data.py"
 MAPPING = "docs/id_mapping_0.2.md"
+#: The week files by week (the bonus counts as week 4 for its data).
+WEEK_FILE = dict(zip((1, 2, 3, 4, "bonus"), WEEK_FILES, strict=True))
+POINTER = "[TASKS.md](../TASKS.md)"
 
-pytestmark = pytest.mark.skipif(not (TASKS.exists() and SCRIPT.exists()), reason="needs the repository checkout")
+pytestmark = pytest.mark.skipif(
+    not (TASKS.exists() and SCRIPT.exists() and all(p.exists() for p in WEEK_FILES)),
+    reason="needs the repository checkout",
+)
 
 #: The questions of every task: (warm-up, core, stretch).
 QUESTIONS = {
@@ -58,11 +66,12 @@ QUESTION = re.compile(
 )
 BONUS_LINE = re.compile(r"^\*\*B\.([1-9])\*\* \*Bonus, (\d+ min|\d+(?:\.\d+)? h)\.\*", re.MULTILINE)
 HOURS = r"\(core path about (\d+(?:\.\d+)?) h, stretch about (\d+(?:\.\d+)?) h\)"
-WEEK_HEADING = re.compile(rf"^## Week ([1-4]): (.+) {HOURS}$", re.MULTILINE)
-TASK_HEADING = re.compile(rf"^### (W[1-4]\.\d) (.+) {HOURS}$", re.MULTILINE)
-#: An ID in the text of TASKS (bold) and in file names.
+#: The title of a week file (its first line) and the heading of a task, one level below it.
+WEEK_HEADING = re.compile(rf"^# Week ([1-4]): (.+) {HOURS}$", re.MULTILINE)
+TASK_HEADING = re.compile(rf"^## (W[1-4]\.\d) (.+) {HOURS}$", re.MULTILINE)
+#: An ID in the text of the week files (bold) and in file names.
 ID = re.compile(r"\b(W[1-4]\.\d\.\d{1,2}|B\.[1-9])\b")
-#: An ID of release 0.1.x, which TASKS names only in the sentence that points to the mapping.
+#: An ID of release 0.1.x, which the entry page names only in the sentence that points to the mapping.
 OLD_ID = re.compile(r"\bT[0-7]\.\d\b")
 OLD_ID_SENTENCE = re.compile(
     r"The IDs of release 0\.1 \(T0\.1 to T7\.4\) are mapped to these in\s+\[" + re.escape(MAPPING) + r"\]"
@@ -73,7 +82,7 @@ FENCE = re.compile(r"^(```|~~~).*?^\1", re.MULTILINE | re.DOTALL)
 
 
 def _markdown_files() -> list[Path]:
-    files = [ROOT / "README.md", TASKS, ROOT / "CHANGELOG.md", ROOT / "NOTICE.md"]
+    files = [ROOT / "README.md", TASKS, *WEEK_FILES, ROOT / "CHANGELOG.md", ROOT / "NOTICE.md"]
     files += sorted((ROOT / "docs").glob("*.md"))
     files += sorted((ROOT / "examples").glob("*/README.md"))
     files += [ROOT / "tests" / "data" / "README.md"]
@@ -81,8 +90,22 @@ def _markdown_files() -> list[Path]:
 
 
 @cache
-def _tasks_text() -> str:
+def _entry_text() -> str:
     return TASKS.read_text(encoding="utf-8")
+
+
+@cache
+def _text(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def _tasks_text() -> str:
+    """The text of the week files, in the order of the course."""
+    return week_files_text()
+
+
+def _name(path: Path) -> str:
+    return path.relative_to(ROOT).as_posix()
 
 
 def _hours(time: str) -> float:
@@ -93,7 +116,7 @@ def _hours(time: str) -> float:
 
 @cache
 def _questions() -> list[tuple[str, str, str, float]]:
-    """(task, ID, tier, hours) of every question of TASKS, in the order of the text."""
+    """(task, ID, tier, hours) of every question of the week files, in the order of the course."""
     out = []
     for match in QUESTION.finditer(_tasks_text()):
         week, task, number, tier, time = match.groups()
@@ -105,30 +128,24 @@ def _all_ids() -> set[str]:
     return {q[1] for q in _questions()} | {f"B.{k}" for k in range(1, BONUS + 1)}
 
 
-def _sections(text: str, level: int) -> list[tuple[str, str]]:
-    """(heading, body) of every heading of exactly ``level``; a body ends at the next heading of that level or above."""
-    parts = re.split(rf"^(#{{1,{level}}} .*)$", FENCE.sub("", text), flags=re.MULTILINE)
-    return [(h, b) for h, b in zip(parts[1::2], parts[2::2], strict=True) if h.startswith("#" * level + " ")]
-
-
 def _weeks() -> dict[int, tuple[str, str]]:
-    """The heading and body of every ``## Week k: ...``."""
+    """The title (first line) and the rest of every week file tasks/week<k>.md."""
     out = {}
-    for heading, body in _sections(_tasks_text(), 2):
-        match = re.match(r"## Week (\d):", heading)
-        if match:
-            out[int(match.group(1))] = (heading, body)
+    for week in (1, 2, 3, 4):
+        heading, _, body = _text(WEEK_FILE[week]).partition("\n")
+        out[week] = (heading, body)
     return out
 
 
 def _tasks() -> dict[str, tuple[str, str]]:
-    """The heading and body of every task ``### Wk.t ...`` (up to the next heading of level 2 to 4)."""
-    parts = re.split(r"^(#{2,4} .*)$", FENCE.sub("", _tasks_text()), flags=re.MULTILINE)
+    """The heading and body of every task ``## Wk.t ...`` (up to the next heading of level 1 to 3), in order."""
     out = {}
-    for heading, body in zip(parts[1::2], parts[2::2], strict=True):
-        match = re.match(r"### (W[1-4]\.\d|B) ", heading)
-        if match:
-            out[match.group(1)] = (heading, body)
+    for path in WEEK_FILES:
+        parts = re.split(r"^(#{1,3} .*)$", FENCE.sub("", _text(path)), flags=re.MULTILINE)
+        for heading, body in zip(parts[1::2], parts[2::2], strict=True):
+            match = re.match(r"## (W[1-4]\.\d|B) ", heading)
+            if match:
+                out[match.group(1)] = (heading, body)
     return out
 
 
@@ -137,7 +154,7 @@ def _tasks() -> dict[str, tuple[str, str]]:
 
 def test_every_question_line_is_well_formed():
     """Every line that starts with a bold ID has the tier and the time: a typo cannot hide a question."""
-    starts = re.findall(r"^\*\*(?:W\d|B\.)[^*]*\*\*.*$", _tasks_text(), flags=re.MULTILINE)
+    starts = re.findall(r"^\*\*(?:W\d|B\.)[^*]*\*\*.*$", _tasks_text() + _entry_text(), flags=re.MULTILINE)
     bad = [line for line in starts if not (QUESTION.match(line) or BONUS_LINE.match(line))]
     assert not bad, f"question lines without '*Tier, time.*': {bad}"
 
@@ -152,6 +169,17 @@ def test_question_ids_unique_and_ordered():
     assert ids == expected
     bonus = [int(n) for n, _ in BONUS_LINE.findall(_tasks_text())]
     assert bonus == list(range(1, BONUS + 1))
+
+
+def test_every_question_is_in_the_file_of_its_week():
+    """``Wk.t.q`` only in tasks/week<k>.md, ``B.q`` only in tasks/bonus.md, and none on the entry page."""
+    assert not QUESTION.findall(_entry_text()), "a question on the entry page TASKS.md"
+    assert not BONUS_LINE.findall(_entry_text()), "a bonus question on the entry page TASKS.md"
+    for week, path in WEEK_FILE.items():
+        weeks = {w for w, *_ in QUESTION.findall(_text(path))}
+        assert weeks == (set() if week == "bonus" else {str(week)}), f"{_name(path)} has questions of weeks {weeks}"
+        bonus = BONUS_LINE.findall(_text(path))
+        assert bool(bonus) == (week == "bonus"), f"{_name(path)}: bonus questions"
 
 
 def test_tiers_ordered_and_complete():
@@ -176,38 +204,97 @@ def test_task_and_week_hours():
         stretch[task] = sum(h for _, _, tier, h in hours if tier == "Stretch")
         assert float(match.group(3)) == pytest.approx(core[task], abs=0.125), f"{task}: core path"
         assert float(match.group(4)) == pytest.approx(stretch[task], abs=0.125), f"{task}: stretch"
-    headings = WEEK_HEADING.findall(_tasks_text())
-    assert [int(w) for w, *_ in headings] == [1, 2, 3, 4]
-    table = _tasks_text().split("\n## ", 1)[0]  # the hours table of the introduction
-    for week, title, week_core, week_stretch in headings:
+    headings = [WEEK_HEADING.fullmatch(heading) for heading, _ in _weeks().values()]
+    assert all(headings), "a week file does not start with '# Week k: title (core path about N h, stretch about M h)'"
+    assert [int(m.group(1)) for m in headings if m] == [1, 2, 3, 4]
+    assert len(WEEK_HEADING.findall(_tasks_text())) == 4, "a week title inside a week file"
+    table = _entry_text().split("\n## ", 1)[0]  # the hours table of the introduction
+    weeks_table = _entry_text()[_entry_text().index("\n## The weeks\n") :]  # the table that links the week files
+    for week, title, week_core, week_stretch in (m.groups() for m in headings if m):
         k = int(week)
         mine = [t for t in QUESTIONS if t.startswith(f"W{k}.")]
         total = sum(core[t] for t in mine) + OVERHEAD[k]
         assert float(week_core) == pytest.approx(total, abs=0.125), f"week {k}: core path"
         assert WEEK_BAND[0] <= float(week_core) <= WEEK_BAND[1], f"week {k}: core path outside {WEEK_BAND} h"
         assert float(week_stretch) == pytest.approx(sum(stretch[t] for t in mine), abs=0.125), f"week {k}: stretch"
-        row = rf"^\| {k} \| {re.escape(title)} \| about {week_core} h \| about {week_stretch} h \|$"
+        cell = rf"\[{re.escape(title)}\]\(tasks/week{k}\.md\)"  # the title links the week file
+        row = rf"^\| {k} \| {cell} \| about {week_core} h \| about {week_stretch} h \|$"
         assert re.search(row, table, flags=re.MULTILINE), f"the hours table of the introduction disagrees on week {k}"
-    bonus = re.search(r"^## Bonus: .* \(about (\d+(?:\.\d+)?) h\)$", _tasks_text(), flags=re.MULTILINE)
-    assert bonus, "no '## Bonus: ... (about N h)' heading"
-    assert float(bonus.group(1)) == pytest.approx(sum(_hours(t) for _, t in BONUS_LINE.findall(_tasks_text())))
+        link = (
+            rf"^\| {k} \| \[tasks/week{k}\.md\]\(tasks/week{k}\.md\) \| {re.escape(title)} \| about {week_core} h \|$"
+        )
+        assert re.search(link, weeks_table, flags=re.MULTILINE), f"'The weeks' of TASKS.md disagrees on week {k}"
+    bonus = re.match(r"# Bonus: (.*) \(about (\d+(?:\.\d+)?) h\)\n", _text(WEEK_FILE["bonus"]))
+    assert bonus, "tasks/bonus.md does not start with '# Bonus: ... (about N h)'"
+    assert float(bonus.group(2)) == pytest.approx(sum(_hours(t) for _, t in BONUS_LINE.findall(_tasks_text())))
+    title, hours = bonus.group(1)[0].upper() + bonus.group(1)[1:], bonus.group(2)
+    row = rf"^\| bonus \| \[{re.escape(title)}\]\(tasks/bonus\.md\) \| \| about {hours} h \|$"
+    assert re.search(row, table, flags=re.MULTILINE), "the hours table of the introduction disagrees on the bonus"
+    cell = r"\[tasks/bonus\.md\]\(tasks/bonus\.md\)"
+    link = rf"^\| bonus \| {cell} \| {re.escape(title)} \| none \(about {hours} h on offer\) \|$"
+    assert re.search(link, weeks_table, flags=re.MULTILINE), "'The weeks' of TASKS.md disagrees on the bonus"
 
 
 # --- structure ----------------------------------------------------------------------------------------------------
+
+
+def _links(text: str) -> list[str]:
+    return [m.group(1) or m.group(2) for m in LINK.finditer(FENCE.sub("", text))]
+
+
+def test_entry_page_and_week_files():
+    """TASKS.md keeps the shared material and links every week file; tasks/ holds the week files and nothing else."""
+    assert sorted(p.name for p in (ROOT / "tasks").iterdir()) == sorted(p.name for p in WEEK_FILES)
+    entry = _entry_text()
+    assert not re.search(r"^#{1,3} (Week [1-4]:|Bonus:|W[1-4]\.\d |B )", entry, flags=re.MULTILINE), (
+        "a week or a task left on the entry page"
+    )
+    for section in ("## How to work", "## What to hand in", "## Notation", "## The weeks"):
+        assert re.search(rf"^{section}$", entry, flags=re.MULTILINE), f"TASKS.md has no {section}"
+    weeks = entry[entry.index("\n## The weeks\n") :]
+    for path in WEEK_FILES:
+        assert _name(path) in _links(weeks), f"'The weeks' of TASKS.md does not link {_name(path)}"
+    for path in WEEK_FILES:
+        lines = _text(path).splitlines()
+        assert lines[0].startswith("# "), f"{_name(path)} does not start with a title"
+        assert len(re.findall(r"^# ", FENCE.sub("", _text(path)), flags=re.MULTILINE)) == 1, f"{_name(path)}: titles"
+        assert lines[1] == "", f"{_name(path)}: a blank line after the title"
+        assert POINTER in lines[2], f"{_name(path)}: the line under the title points back to TASKS.md"
+
+
+def test_week_files_link_back_and_to_their_neighbours():
+    """Each week file ends with links to the previous and the next week file (where there is one) and to TASKS.md."""
+    for k, path in enumerate(WEEK_FILES):
+        text = _text(path)
+        end = text[text.rindex("\n---\n") :]  # the links after the last rule
+        links = [target.partition("#")[0] for target in _links(end)]
+        expected = [p.name for p in WEEK_FILES[max(k - 1, 0) : k + 2] if p != path]
+        assert [t for t in links if not t.startswith("../")] == expected, f"{_name(path)}: the week links {links}"
+        assert "../TASKS.md" in links, f"{_name(path)} does not link back to TASKS.md at its end"
+        if k > 0:
+            assert f"**Previous:** [{_title(WEEK_FILES[k - 1])}]" in end, f"{_name(path)}: the previous week"
+        if k + 1 < len(WEEK_FILES):
+            assert f"**Next:** [{_title(WEEK_FILES[k + 1])}]" in end, f"{_name(path)}: the next week"
+
+
+def _title(path: Path) -> str:
+    """The title of a week file without its hours: ``Week 2: Taggers, from cuts to transformers``."""
+    title = _text(path).partition("\n")[0].removeprefix("# ")
+    return re.sub(r" \((?:core path|about) [^)]*\)$", "", title)
 
 
 def test_every_week_has_its_parts_in_order():
     weeks = _weeks()
     assert sorted(weeks) == [1, 2, 3, 4]
     for k, (_, body) in weeks.items():
-        summary = "#### Final summary" if k == 4 else "#### Weekly summary"
+        summary = "### Final summary" if k == 4 else "### Weekly summary"
         parts = [
             "**Why this week.**",
             "**Thread.**",
             "**Concepts this week**",
             "**Start of week**",
-            f"### Data for week {k}",
-            f"### W{k}.",
+            f"## Data for week {k}",
+            f"## W{k}.",
             summary,
         ]
         where = []
@@ -217,8 +304,8 @@ def test_every_week_has_its_parts_in_order():
         assert where == sorted(where), f"week {k}: its parts are out of order"
         for part in ("**If you are behind**", "**First stretch picks"):
             assert part in body, f"week {k} has no {part}"
-            assert body.index(part) < body.index(f"### W{k}."), f"week {k}: {part} after the first task"
-        tasks = re.findall(rf"^### (W{k}\.\d) ", body, flags=re.MULTILINE)
+            assert body.index(part) < body.index(f"## W{k}."), f"week {k}: {part} after the first task"
+        tasks = re.findall(rf"^## (W{k}\.\d) ", body, flags=re.MULTILINE)
         assert tasks == [t for t in QUESTIONS if t.startswith(f"W{k}.")], f"week {k}: tasks"
 
 
@@ -253,14 +340,16 @@ def test_figure_names_start_with_their_id():
 
 
 def test_no_old_ids_and_no_course_fix_codes():
-    text = _tasks_text()
-    assert len(OLD_ID_SENTENCE.findall(text)) == 1, f"the sentence that points to {MAPPING} is missing"
-    assert not OLD_ID.findall(OLD_ID_SENTENCE.sub("", text)), "an ID of release 0.1 in TASKS.md"
-    assert not re.findall(r"\bCF-\d+\b", text), "a course-fix code in TASKS.md"
-    assert f"]({MAPPING})" in text
+    entry = _entry_text()
+    assert len(OLD_ID_SENTENCE.findall(entry)) == 1, f"the sentence of TASKS.md that points to {MAPPING} is missing"
+    assert f"]({MAPPING})" in entry
+    for path in (TASKS, *WEEK_FILES):
+        text = OLD_ID_SENTENCE.sub("", _text(path))
+        assert not OLD_ID.findall(text), f"an ID of release 0.1 in {_name(path)}"
+        assert not re.findall(r"\bCF-\d+\b", text), f"a course-fix code in {_name(path)}"
 
 
-#: Phrases that give a result away; TASKS gives inputs, never answers, reference values or truth values.
+#: Phrases that give a result away; the task files give inputs, never answers, reference values or truth values.
 ANSWER_PHRASES = re.compile(
     r"answer is|answer:|solution:|reference value|you should (?:find|get|see) (?:about|around|that)"
     r"|should (?:be|come out|give) (?:about|around|close to|near|roughly)|expected (?:value|answer|result)"
@@ -275,18 +364,26 @@ METRIC_VALUE = re.compile(
 SET_UP_CHECKS = ("after 30 steps expect an accuracy of about", "an\naccuracy near 1/3, chance for three classes")
 
 
-def test_no_answers_in_tasks():
-    text = _tasks_text()
+@pytest.mark.parametrize("path", [TASKS, *WEEK_FILES], ids=lambda p: p.name)
+def test_no_answers_in_tasks(path):
+    text = _text(path)
     for allowed in SET_UP_CHECKS:
         text = text.replace(allowed, "")
-    assert not ANSWER_PHRASES.findall(text), "TASKS.md gives a result away"
+    assert not ANSWER_PHRASES.findall(text), f"{_name(path)} gives a result away"
     found = [m.group(0) for m in METRIC_VALUE.finditer(text)]
-    assert not found, f"a value of a metric in TASKS.md (answers stay in the reference solutions): {found}"
+    assert not found, f"a value of a metric in {_name(path)} (answers stay in the reference solutions): {found}"
 
 
-def test_python_snippets_import_what_they_use():
+def test_set_up_checks_are_still_there():
+    """The allowed sentences of SET_UP_CHECKS exist, so that the list cannot hide a later answer."""
+    for allowed in SET_UP_CHECKS:
+        assert allowed in _tasks_text(), f"no longer in the week files: {allowed!r}"
+
+
+@pytest.mark.parametrize("path", WEEK_FILES, ids=lambda p: p.name)
+def test_python_snippets_import_what_they_use(path):
     """A snippet that calls ``itj.<module>.`` imports that module, in the snippet or an earlier one of its question."""
-    lines = _tasks_text().splitlines()
+    lines = _text(path).splitlines()
     imported: set[str] = set()
     k, missing = 0, []
     while k < len(lines):
@@ -305,7 +402,8 @@ def test_python_snippets_import_what_they_use():
                 for use in re.findall(r"\b(itj(?:\.\w+)+)", text.split("#")[0]):
                     module = _module_of(use)
                     if not any(m == module or m.startswith(module + ".") for m in imported):
-                        missing.append(f"line {k + 1 + body.index(text) + 1}: {use} without import {module}")
+                        where = f"{_name(path)}:{k + 1 + body.index(text) + 1}"
+                        missing.append(f"{where}: {use} without import {module}")
             k = end
         k += 1
     assert not missing, "\n".join(missing)
@@ -347,7 +445,7 @@ def _produced() -> dict[str, int]:
     module = _script()
     produced: dict[str, int] = {}
     for week in (4, 3, 2, 1):  # the earliest block wins
-        for command in module.task_commands(TASKS, str(week)):
+        for command in module.task_commands(ROOT / "tasks", str(week)):
             if command[0] != "fetch":
                 produced.update((p.as_posix(), week) for p in module.output_of(command))
             elif command[1] == "jetclass":
@@ -379,17 +477,23 @@ def _data_paths(text: str) -> list[str]:
 
 
 def test_every_data_file_is_produced_by_a_block():
-    missing = sorted({name for name in _data_paths(_tasks_text()) if _week_of(name) is None})
-    assert not missing, f"used in TASKS.md but made by no data block: {missing}"
+    missing = sorted(
+        {
+            f"{_name(path)}: {name}"
+            for path in (TASKS, *WEEK_FILES)
+            for name in _data_paths(_text(path))
+            if _week_of(name) is None
+        }
+    )
+    assert not missing, f"used in the task files but made by no data block: {missing}"
 
 
 def test_no_week_needs_the_data_of_a_later_week():
     """A path used in week k is made by the block of week k or an earlier one; the bonus counts as week 4."""
     late = []
-    sections = {k: body for k, (_, body) in _weeks().items()}
-    bonus = _tasks_text()[_tasks_text().index("## Bonus:") :]
-    for week, body in [*sections.items(), (4, bonus)]:
-        for name in _data_paths(body):
+    for key, path in WEEK_FILE.items():
+        week = 4 if key == "bonus" else key
+        for name in _data_paths(_text(path)):
             made = _week_of(name)
             if made is not None and made > week:
                 late.append(f"week {week} uses {name} (made in week {made})")
@@ -428,11 +532,19 @@ def test_slug():
     )
 
 
+def _notebook_markdown(path: Path) -> str:
+    """The markdown cells of a notebook, joined."""
+    cells = json.loads(path.read_text(encoding="utf-8"))["cells"]
+    return "\n".join("".join(cell["source"]) for cell in cells if cell["cell_type"] == "markdown")
+
+
 def test_relative_links_and_anchors_resolve():
+    """The links of the documents and of the markdown cells of the notebooks point at files and headings that exist."""
     broken = []
-    for path in _markdown_files():
-        text = FENCE.sub("", path.read_text(encoding="utf-8"))
-        for match in LINK.finditer(text):
+    notebooks = sorted((ROOT / "notebooks").glob("*.ipynb"))
+    for path in [*_markdown_files(), *notebooks]:
+        text = _notebook_markdown(path) if path.suffix == ".ipynb" else path.read_text(encoding="utf-8")
+        for match in LINK.finditer(FENCE.sub("", text)):
             target = match.group(1) or match.group(2)
             if re.match(r"^[a-z][a-z0-9+.-]*:", target):  # http:, https:, mailto:, ...
                 continue

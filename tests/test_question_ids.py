@@ -1,20 +1,22 @@
-"""docs/id_mapping_0.2.md: every question ID of 0.1.x maps to IDs of TASKS.md, and every ID of TASKS.md is covered.
+"""docs/id_mapping_0.2.md: every question ID of 0.1.x maps to IDs of the week files, and every ID of them is covered.
 
-The mapping is what the reference solutions, the grading notes, the course fixes and the result keys are remapped
-with, so it must stay complete when TASKS.md changes (a renumbering or a move across a tier is recorded there).
+The questions are in tasks/week1.md to tasks/week4.md and tasks/bonus.md. The mapping is what the reference solutions,
+the grading notes, the course fixes and the result keys are remapped with, so it must stay complete when a week file
+changes (a renumbering or a move across a tier is recorded there).
 """
 
 import re
 from functools import cache
-from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-TASKS = ROOT / "TASKS.md"
+from helpers import ROOT, WEEK_FILES, week_files_text
+
 MAPPING = ROOT / "docs" / "id_mapping_0.2.md"
 
-pytestmark = pytest.mark.skipif(not (TASKS.exists() and MAPPING.exists()), reason="needs the repository checkout")
+pytestmark = pytest.mark.skipif(
+    not (all(p.exists() for p in WEEK_FILES) and MAPPING.exists()), reason="needs the repository checkout"
+)
 
 #: The questions of every task of 0.1.x: T0.1-T0.4, T1.1-T1.7, ..., T7.1-T7.4 (49 IDs).
 QUESTIONS_0_1 = {0: 4, 1: 7, 2: 7, 3: 7, 4: 6, 5: 7, 6: 7, 7: 4}
@@ -26,8 +28,8 @@ TIER_OF = {"Warm-up": "warm-up", "Core": "core", "Stretch": "stretch", "Bonus": 
 
 @cache
 def _tasks() -> dict[str, str]:
-    """Every question ID of TASKS.md with its tier (warm-up, core, stretch or bonus), in order."""
-    text = TASKS.read_text(encoding="utf-8")
+    """Every question ID of the week files with its tier (warm-up, core, stretch or bonus), in order."""
+    text = week_files_text()
     found = re.findall(rf"^\*\*({NEW_ID})\*\* \*(Warm-up|Core|Stretch|Bonus),", text, flags=re.MULTILINE)
     return {qid: TIER_OF[tier] for qid, tier in found}
 
@@ -104,26 +106,26 @@ def test_every_mapped_id_exists_with_its_tier():
     for old, part, ids, tiers, raw in _forward():
         every = re.findall(rf"`({NEW_ID})`", raw)  # also the IDs in remarks such as "(previewed in ...)"
         unknown = [i for i in every if i not in tasks]
-        assert not unknown, f"{old} ({part}) maps to IDs that TASKS.md does not have: {unknown}"
+        assert not unknown, f"{old} ({part}) maps to IDs that the week files do not have: {unknown}"
         if old == "new" or not ids:
             continue
         if not tiers and "*Start of week* box" in raw:  # a part that became a command of a box, used from an ID on
             continue
         assert len(tiers) == len(ids), f"{old} ({part}): one tier per ID, {ids} against {tiers}"
         for qid, tier in zip(ids, tiers, strict=True):
-            assert tier == tasks[qid], f"{old} ({part}): {qid} is {tasks[qid]} in TASKS.md, not {tier}"
+            assert tier == tasks[qid], f"{old} ({part}): {qid} is {tasks[qid]} in the week files, not {tier}"
 
 
 def test_every_new_id_is_covered():
-    """Every ID of TASKS.md appears in the forward table: as the target of an old ID or in the row "new"."""
+    """Every ID of the week files appears in the forward table: as the target of an old ID or in the row "new"."""
     covered = {qid for *_, raw in _forward() for qid in re.findall(rf"`({NEW_ID})`", raw)}
     missing = [qid for qid in _tasks() if qid not in covered]
-    assert not missing, f"IDs of TASKS.md that the mapping does not name: {missing}"
+    assert not missing, f"IDs of the week files that the mapping does not name: {missing}"
     assert any(old == "new" for old, *_ in _forward()), "the forward table has no row 'new'"
 
 
 def test_reverse_table_agrees():
-    """The reverse table covers every ID of TASKS.md once, in order, and names the same 0.1.x sources."""
+    """The reverse table covers every ID of the week files once, in order, and names the same 0.1.x sources."""
     tasks = list(_tasks())
     reverse: dict[str, set[str]] = {}
     order: list[str] = []
@@ -146,7 +148,7 @@ def test_reverse_table_agrees():
             else:
                 reverse[qid] = set(olds)
         order += ids
-    assert order == tasks, "the reverse table must list every ID of TASKS.md once, in order"
+    assert order == tasks, "the reverse table must list every ID of the week files once, in order"
     forward: dict[str, set[str]] = {qid: set() for qid in tasks}
     for old, _, ids, _, _ in _forward():
         for qid in ids:

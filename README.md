@@ -42,9 +42,7 @@ Particle Transformer (ParT), the transformer trained on it. The repository `insi
 | stage | content                                                                                                   | status               |
 |-------|-----------------------------------------------------------------------------------------------------------|----------------------|
 | A     | **A Spray of Hadrons** and JetClass: a four-week course from jets to taggers, representations and interpretability ([TASKS.md](TASKS.md)) | this release (0.2.0) |
-| B     | Symmetry-aware taggers: Lorentz-equivariant networks (networks built to respect relativity: LorentzNet, PELICAN, L-GATr) on the toy and on JetClass | next                 |
-| C     | Pretraining at scale and foundation models for jets (large networks pretrained on many jets and reused for many tasks) | later                |
-| D     | Research projects                                                                                         | later                |
+| B     | TBD                                                                                                       | next                 |
 
 ## The toy jets
 
@@ -178,18 +176,20 @@ primer](docs/ml_primer.md#networks-on-particles)). JetClass, ParT and weaver in 
 ## The course
 
 [TASKS.md](TASKS.md) is the course of stage A: four weeks for undergraduates who know first-year physics and Python with
-NumPy, and who have met neither particle physics nor PyTorch. Each week takes 2-3 working days. The core path is made of
-the warm-up and core questions (see *Three tiers* below). It takes about 13-14 hours including reading and writing up:
-two days of about 6.5-7 hours or three shorter days. In a week of two shorter days, the fallbacks marked *two-day* in
-TASKS.md apply from the start. A third day is for stretch questions (the harder, optional ones) and catch-up.
+NumPy, and who have met neither particle physics nor PyTorch. TASKS.md holds the rules, the hand-in and the notation;
+the questions of each week are in a file of their own, `tasks/week1.md` to `tasks/week4.md` and `tasks/bonus.md`. Each
+week takes 2-3 working days. The core path is made of the warm-up and core questions (see *Three tiers* below). It takes
+about 13-14 hours including reading and writing up: two days of about 6.5-7 hours or three shorter days. In a week of
+two shorter days, the fallbacks marked *two-day* in the week file apply from the start. A third day is for stretch
+questions (the harder, optional ones) and catch-up.
 
 | week | question | what you do | core path | data |
 |------|----------|-------------|-----------|------|
-| 1 | What is a jet? | the set-up; jets from zero (the primer and ten guided exercises on the toy); the ladder of the toy on many jets; the jet mass; counting prongs | about 13.75 h | 0.48 GB |
-| 2 | Taggers, from cuts to transformers | one cut; boosted decision trees; a first neural network, written from zero; Deep Sets; graphs and attention (the five course models train in the background) | about 12.75 h | 0.38 GB |
-| 3 | What do taggers learn? | embeddings and probes; what the taggers use; IRC safety and symmetries; learning without labels | about 13.5 h | 0.39 GB; the JetClass downloads start |
-| 4 | Real jets, and where does a tagger look? | JetClass; the pretrained ParT; IRC tests of networks; attributions on the toy; where the real ParT looks | about 12.75 h | 0.4 GB of downloads, 1.2 GB written |
-| bonus | Towards a research project | self-supervision on JetClass, masked particle modelling, shortcut hunting, a paper from current research, a proposal | none (about 24.5 h on offer) | made by the week-4 start-of-week box |
+| 1 | [What is a jet?](tasks/week1.md) | the set-up; jets from zero (the primer and ten guided exercises on the toy); the ladder of the toy on many jets; the jet mass; counting prongs | about 13.75 h | 0.48 GB |
+| 2 | [Taggers, from cuts to transformers](tasks/week2.md) | one cut; boosted decision trees; a first neural network, written from zero; Deep Sets; graphs and attention (the five course models train in the background) | about 12.75 h | 0.38 GB |
+| 3 | [What do taggers learn?](tasks/week3.md) | embeddings and probes; what the taggers use; IRC safety and symmetries; learning without labels | about 13.5 h | 0.39 GB; the JetClass downloads start |
+| 4 | [Real jets, and where does a tagger look?](tasks/week4.md) | JetClass; the pretrained ParT; IRC tests of networks; attributions on the toy; where the real ParT looks | about 12.75 h | 0.4 GB of downloads, 1.2 GB written |
+| bonus | [Towards a research project](tasks/bonus.md) | self-supervision on JetClass, masked particle modelling, shortcut hunting, a paper from current research, a proposal | none (about 24.5 h on offer) | made by the week-4 start-of-week box |
 
 The terms in this table are explained in the glossary, [docs/glossary.md](docs/glossary.md).
 

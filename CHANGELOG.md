@@ -36,10 +36,10 @@ stored in a file records the new package version).
   `primer_lund`): the collider coordinates, a boosted W decay and the primary Lund plane of one jet.
 - `docs/id_mapping_0.2.md`: the ID scheme, the mapping from 0.1.x to 0.2.0 (split questions part by part) and the
   reverse index.
-- Per week in TASKS.md: why this week, the thread, the concepts in order of use, the week at a glance, a *Start of
-  week* box, a day plan for two core days (or three shorter ones), a check-in at the end of day 1, fallbacks for a
-  student who is behind (with the time saved and what is lost), the first stretch picks and a weekly summary; a
-  realistic time for every question, its reading included; a hand-in by ID in `answers/week<k>.md`.
+- Per week, in its file `tasks/week<k>.md`: why this week, the thread, the concepts in order of use, the week at a
+  glance, a *Start of week* box, a day plan for two core days (or three shorter ones), a check-in at the end of day 1,
+  fallbacks for a student who is behind (with the time saved and what is lost), the first stretch picks and a weekly
+  summary; a realistic time for every question, its reading included; a hand-in by ID in `answers/week<k>.md`.
 - Fifteen new or partly new questions, the steps of the ladders: W1.1.1-W1.1.3, W1.1.6-W1.1.10, W1.2.3, W2.1.1,
   W2.2.1, W2.3.1, W2.3.2, W2.4.1 and W4.1.1.
 - *In words* leads (two or three sentences before the formulas) in observables.md (soft drop, N-subjettiness, energy
@@ -48,7 +48,7 @@ stored in a file records the new package version).
   in methods.md; "New to jets?" pointers to the primer at the top of physics.md, observables.md and data_format.md, and
   pointers to the machine-learning primer in models.md and methods.md.
 - Glossary entries for the basic terms of jet physics and machine learning, each with its primer section.
-- Tests: the ID inventory, tier order and times of TASKS.md, the weekly hour guard, the order of the data blocks,
+- Tests: the ID inventory, tier order and times of the week files, the weekly hour guard, the order of the data blocks,
   figure names, the mapping table, the IDs cited in the docs and code, the data commands against a golden list of
   0.1.1, the primer and the four notebooks, and that no page the primer links to before W1.1.3 states its result.
 
@@ -63,6 +63,8 @@ stored in a file records the new package version).
   dictionary moves from the set-up to week 4. The core path is about 13-14 hours a week (13.75, 12.75, 13.5 and 12.75
   h, reading and writing up included: two days of about 6.5-7 hours or three shorter days, with fallbacks marked
   *two-day* for a week of two shorter days); about 98.5 hours of stretch and 24.5 hours of bonus are on offer.
+- TASKS.md is split into an entry page (the rules, the hand-in, the figure checklist, the notation and a table of the
+  weeks) and one file per week, `tasks/week1.md` to `tasks/week4.md` and `tasks/bonus.md`, each linking back to it.
 - Week 2 trains the five course models (PFN, EFN, PN-lite, ParT-small and ParT-small without the pair bias) with one
   command in its *Start of week* box (`examples/train_tagger.py --course-models --out models/course --threads N`), one
   after the other in the background; they replace the two ParT-small trainings side by side (13 GB together; the
@@ -74,7 +76,7 @@ stored in a file records the new package version).
   stretch questions.
 - The JetClass downloads start at the start of week 3 (`python examples/make_task_data.py --week 4 --only fetch`), a
   week before they are needed; the weaver install moves to its question (W4.2.7).
-- `examples/make_task_data.py`: `--week 1|2|3|4|all`, one data block per week (`### Data for week 1` to `4`);
+- `examples/make_task_data.py`: `--week 1|2|3|4|all`, one data block per week file (`## Data for week 1` to `4`);
   `block_for(path)` names the block that makes a file, and a missing input names the week's block, as does
   `examples/train_tagger.py`.
 - After a dry run of week 1 by a reader without a background in jets: the displayed W jet is that of seed 12, which
@@ -82,7 +84,7 @@ stored in a file records the new package version).
   compares the opening angle jet by jet and leaves the closest pair of a top to W1.1.10; W1.3.2 names its measures of
   width; W3.3.2 classifies $\tau_2$ instead of $\tau_{21}$, whose Sudakov safety stays in W3.3.4; the IRC
   classification of observables.md sits in a box to open after W3.3.2, and physics.md, methods.md, the glossary and
-  TASKS.md no longer state results that a question asks for; the primer explains the width of an unstable particle
+  the week files no longer state results that a question asks for; the primer explains the width of an unstable particle
   (W1.2.2) and gives the toy's ranges of $p_T$ and of underlying-event particles; `boost` of `itj.toy.kinematics` is
   described with its sign.
 - Times: realistic student hours per question and per week, reading included; measured compute times for the

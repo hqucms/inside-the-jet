@@ -1,7 +1,8 @@
 # Glossary
 
 The terms of jet physics, machine learning and statistics that the questions use, in alphabetical order. Each entry
-names the question of [TASKS.md](../TASKS.md) where the term is first needed and links to the section that defines it.
+names the question where the term is first needed (in the week files that [TASKS.md](../TASKS.md) links) and links to
+the section that defines it.
 For the basic terms this is a section of the primers, [primer.md](primer.md) (*Jets from zero*) and
 [ml_primer.md](ml_primer.md) (*Machine learning from zero*). For the rest it is a section of the reference docs. A
 primer section is read just before the question named.

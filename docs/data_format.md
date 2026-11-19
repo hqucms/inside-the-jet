@@ -56,8 +56,9 @@ Large files are best read in chunks: `for chunk in data.chunks(2000): ...`. `dat
 jet columns (`level="particle"`: one row per particle).
 
 The data files of the course (`data/t1_*.parquet`, `t2_`, `t3_`, `t6_`, `t7_`) keep the names of release 0.1, where the
-number was that of the task. They are names, not question IDs. [TASKS.md](../TASKS.md) says which week makes each
-file (`python examples/make_task_data.py --week 1` to `--week 4`).
+number was that of the task. They are names, not question IDs. The data blocks of the week files, [Data for week
+1](../tasks/week1.md#data-for-week-1) to [Data for week 4](../tasks/week4.md#data-for-week-4), say which week makes
+each file (`python examples/make_task_data.py --week 1` to `--week 4`).
 
 `jetgen info FILE` prints the counts per process, the mean multiplicity, the preset, the seed and the wall time
 (`--columns`: every column with its dtype; `--provenance`: the full provenance). The files are plain Parquet, so any

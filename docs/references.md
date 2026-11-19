@@ -108,8 +108,8 @@ classes) are in [jetclass.md](jetclass.md#the-data-set); they differ in the last
 Every entry gives the authors, the title, the journal (or "preprint") and the arXiv number
 (`https://arxiv.org/abs/<number>`). The arXiv numbers were checked against the arXiv API on 2026-11-05. The two entries
 added in 0.2.0, Salam and Guest, Cranmer and Whiteson, were added from their journal versions. The list is grouped by
-the week of the course in which a paper is first needed. The "used in" column names the questions (IDs of
-[TASKS.md](../TASKS.md)), tasks or weeks and the documentation pages where the paper is needed.
+the week of the course in which a paper is first needed. The "used in" column names the questions (IDs of the week
+files that [TASKS.md](../TASKS.md) links), tasks or weeks and the documentation pages where the paper is needed.
 
 **Start here.** Each week opens with one or two readings to start with, listed first in its table:
 
@@ -263,14 +263,14 @@ gradients before `W4.4`, and Jain and Wallace, *Attention is not Explanation*, f
 | K. He et al., *Masked Autoencoders Are Scalable Vision Learners*, CVPR (2022), arXiv:2111.06377 | `B.2` |
 | J. Devlin, M.-W. Chang, K. Lee and K. Toutanova, *BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding*, NAACL (2019), arXiv:1810.04805 | `B.2` |
 
-### Outlook: symmetry-aware networks (stage B)
+### Outlook: symmetry-aware networks
 
 | reference | used in |
 |---|---|
-| S. Gong et al., *An Efficient Lorentz Equivariant Graph Neural Network for Jet Tagging*, JHEP 07 (2022) 030, arXiv:2201.08187 | stage B |
-| A. Bogatskiy, T. Hoffman, D. W. Miller and J. T. Offermann, *PELICAN: Permutation Equivariant and Lorentz Invariant or Covariant Aggregator Network for Particle Physics*, preprint (2022), arXiv:2211.00454 | stage B |
-| A. Bogatskiy et al., *Explainable Equivariant Neural Networks for Particle Physics: PELICAN*, JHEP 2024, 113 (2024), arXiv:2307.16506 | stage B |
-| J. Spinner et al., *Lorentz-Equivariant Geometric Algebra Transformers for High-Energy Physics*, NeurIPS (2024), arXiv:2405.14806 | stage B |
+| S. Gong et al., *An Efficient Lorentz Equivariant Graph Neural Network for Jet Tagging*, JHEP 07 (2022) 030, arXiv:2201.08187 | further reading |
+| A. Bogatskiy, T. Hoffman, D. W. Miller and J. T. Offermann, *PELICAN: Permutation Equivariant and Lorentz Invariant or Covariant Aggregator Network for Particle Physics*, preprint (2022), arXiv:2211.00454 | further reading |
+| A. Bogatskiy et al., *Explainable Equivariant Neural Networks for Particle Physics: PELICAN*, JHEP 2024, 113 (2024), arXiv:2307.16506 | further reading |
+| J. Spinner et al., *Lorentz-Equivariant Geometric Algebra Transformers for High-Energy Physics*, NeurIPS (2024), arXiv:2405.14806 | further reading |
 
 ### General
 

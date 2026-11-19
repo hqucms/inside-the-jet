@@ -1,4 +1,4 @@
-"""docs/primer.md and docs/ml_primer.md: the fixed section anchors that TASKS.md links to, and the Python blocks run."""
+"""docs/primer.md and docs/ml_primer.md: the section anchors that the week files link to, and the Python blocks run."""
 
 import re
 from pathlib import Path
@@ -62,7 +62,7 @@ def test_sections_and_their_order(path, anchors):
     assert path.exists(), f"{path.relative_to(ROOT)} is missing"
     found = _anchors_in_order(path)
     missing = [a for a in anchors if a not in found]
-    assert not missing, f"{path.name}: sections missing (TASKS.md links to them): {missing}"
+    assert not missing, f"{path.name}: sections missing (the week files link to them): {missing}"
     positions = [found.index(a) for a in anchors]
     assert positions == sorted(positions), f"{path.name}: the sections are out of order"
 

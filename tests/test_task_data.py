@@ -1,6 +1,7 @@
-"""The data commands of TASKS.md (read by examples/make_task_data.py) parse and run, with fewer jets."""
+"""The data commands of the week files (read by examples/make_task_data.py) parse and run, with fewer jets."""
 
 import importlib.util
+import re
 import shlex
 from collections import Counter
 from pathlib import Path
@@ -18,10 +19,10 @@ TRAIN_TAGGER = ROOT / "examples" / "train_tagger.py"
 SAMPLE = Path(__file__).parent / "data" / "jetclass_sample.parquet"
 
 pytestmark = pytest.mark.skipif(
-    not (SCRIPT.exists() and (ROOT / "TASKS.md").exists()), reason="needs the repository checkout"
+    not (SCRIPT.exists() and (ROOT / "tasks" / "week1.md").exists()), reason="needs the repository checkout"
 )
 
-#: The number of commands in the blocks "Data for week 1" to "Data for week 4".
+#: The number of commands in the blocks "Data for week 1" to "Data for week 4" (tasks/week1.md to tasks/week4.md).
 N_WEEK = {"1": 10, "2": 1, "3": 8, "4": 7}
 
 #: The 26 commands of the two data blocks of release 0.1.1 (without the leading ``jetgen``). Release 0.2.0 only
@@ -97,6 +98,16 @@ def test_blocks_parse(script):
             script.task_commands(week=bad)
 
 
+def test_each_block_is_in_the_file_of_its_week(script):
+    """The heading "Data for week k" is in tasks/week<k>.md only: no other task file holds a data block."""
+    files = [ROOT / "TASKS.md", *sorted((ROOT / "tasks").glob("*.md"))]
+    for path in files:
+        found = re.findall(r"^#+ Data for week (\d)$", path.read_text(encoding="utf-8"), flags=re.MULTILINE)
+        mine = [path.name.removeprefix("week").removesuffix(".md")] if path.name.startswith("week") else []
+        assert found == mine, f"{path.relative_to(ROOT)}: data blocks of weeks {found}"
+        assert all(script.week_file(week) == path for week in found)
+
+
 def test_commands_are_those_of_0_1_1(script):
     """The guard for bit-identical data: the 26 commands of 0.1.1, character for character, only regrouped."""
     commands = [shlex.join(c) for c in script.task_commands()]
@@ -148,7 +159,7 @@ def test_block_for(script):
 
 
 def test_train_tagger_names_the_same_block(script):
-    """The hint of examples/train_tagger.py for a missing input agrees with the data blocks of TASKS.md."""
+    """The hint of examples/train_tagger.py for a missing input agrees with the data blocks of the week files."""
     train_tagger = _load(TRAIN_TAGGER, "train_tagger")
     paths = [p for c in script.task_commands() if c[0] != "fetch" for p in script.output_of(c)]
     paths += [Path("data/jetclass/val") / MANIFEST["val", short].filename for short in ("QCD", "Wqq", "Tbqq")]
@@ -190,12 +201,13 @@ def test_task_commands_run(script, tmp_path, capsys):
 
 
 def _fake_repo(root: Path, blocks: dict[str, list[str]]) -> Path:
-    text = ["# Tasks", ""]
+    """Write tasks/week1.md to tasks/week4.md under ``root`` with these data blocks; return the folder."""
+    (root / "tasks").mkdir()
     for week in N_WEEK:
-        text += [f"## Week {week}: a title", "", f"### Data for week {week}", "", "```bash", f"# week {week}"]
+        text = [f"# Week {week}: a title", "", f"## Data for week {week}", "", "```bash", f"# week {week}"]
         text += [*blocks.get(week, []), "```", ""]
-    (root / "TASKS.md").write_text("\n".join(text), encoding="utf-8")
-    return root / "TASKS.md"
+        (root / "tasks" / f"week{week}.md").write_text("\n".join(text), encoding="utf-8")
+    return root / "tasks"
 
 
 def test_main_runs_keeps_and_overwrites(script, tmp_path, monkeypatch, capsys):
@@ -211,12 +223,12 @@ def test_main_runs_keeps_and_overwrites(script, tmp_path, monkeypatch, capsys):
         },
     )
     monkeypatch.setattr(script, "ROOT", tmp_path)
-    monkeypatch.setattr(script, "TASKS", tasks)
+    monkeypatch.setattr(script, "TASKS_DIR", tasks)
     monkeypatch.chdir(tmp_path)
 
     assert script.main(["--dry-run", "--week", "4", "--skip-fetch"]) == 0
     out = capsys.readouterr().out
-    assert out.splitlines()[0].startswith("2 data sets for TASKS.md, written to")
+    assert out.splitlines()[0].startswith("2 data sets for tasks/week4.md, written to")
     assert "fetch" not in out
 
     assert script.main(["--dry-run", "--week", "1"]) == 0  # an empty block
@@ -257,7 +269,7 @@ def test_missing_jetclass_names_the_fetch(script, tmp_path, monkeypatch, capsys)
         },
     )
     monkeypatch.setattr(script, "ROOT", tmp_path)
-    monkeypatch.setattr(script, "TASKS", tasks)
+    monkeypatch.setattr(script, "TASKS_DIR", tasks)
     monkeypatch.chdir(tmp_path)
     assert script.main(["--week", "4", "--skip-fetch"]) == 1
     assert "make it first: python examples/make_task_data.py --week 4 --only fetch" in capsys.readouterr().err

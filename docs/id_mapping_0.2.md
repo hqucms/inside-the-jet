@@ -3,14 +3,17 @@
 Release 0.2.0 re-paces the course over four weeks and renumbers its questions. This page maps every question ID of 0.1.x
 to the question or questions of 0.2.0 that hold it, and back. It holds no answers. The reference solutions, the
 grading notes, the course fixes and the result keys are remapped with it; until then they keep the 0.1.x IDs. The
-questions themselves are in [TASKS.md](../TASKS.md).
+questions themselves are in one file per week: an ID `W1.*` is in [tasks/week1.md](../tasks/week1.md), `W2.*` in
+[tasks/week2.md](../tasks/week2.md), `W3.*` in [tasks/week3.md](../tasks/week3.md), `W4.*` in
+[tasks/week4.md](../tasks/week4.md) and `B.*` in [tasks/bonus.md](../tasks/bonus.md). The rules and the notation are
+in [TASKS.md](../TASKS.md).
 
 ## The ID scheme
 
 - **0.2.0:** `W<week>.<task>.<question>`, for example `W2.3.3` (week 2, task 3, question 3). Weeks 1-4; tasks are
   numbered from 1 in every week (week 1 also has task 0, the set-up); questions from 1 in every task, warm-up first,
   then core, then stretch. A task is `W3.4`, a week "week 3". The bonus questions are `B.1` to `B.5`.
-- **The tier is not part of the ID.** TASKS.md prints it next to every ID (*Warm-up*, *Core*, *Stretch*). A later
+- **The tier is not part of the ID.** The week files print it next to every ID (*Warm-up*, *Core*, *Stretch*). A later
   move of a question across the core/stretch line therefore keeps its ID; any other move will be recorded here.
 - **0.1.x:** `T<task>.<question>` (`T0.1` to `T7.4`, 49 questions). The `W` prefix with three numbers cannot be read as
   an old ID, so both can stand side by side.

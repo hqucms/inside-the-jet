@@ -16,9 +16,9 @@ back with ``itj.models.load_model``), ``PREFIX_history.json`` (loss, accuracy an
 
 By default the script uses half of the cores (``--threads``), so that two trainings can run side by side; the
 start-of-week box of week 2 passes ``--threads`` (the cores minus two) so that the student's own work stays responsive.
-``--course-models`` trains, one after the other with seed 0, the models of weeks 2 to 4 (TASKS.md writes them into
-``models/course/`` with the last command above): ``pfn`` and ``efn`` (105 000 jets, 10 epochs), ``pnlite`` (60 000
-jets, 5 epochs), ``partsmall`` and ``partsmall_nopair`` (30 000 jets, 5 epochs each).
+``--course-models`` trains, one after the other with seed 0, the models of weeks 2 to 4 (the start-of-week box of
+tasks/week2.md writes them into ``models/course/`` with the last command above): ``pfn`` and ``efn`` (105 000 jets, 10
+epochs), ``pnlite`` (60 000 jets, 5 epochs), ``partsmall`` and ``partsmall_nopair`` (30 000 jets, 5 epochs each).
 """
 
 from __future__ import annotations
@@ -50,8 +50,8 @@ LABEL_SETS: dict[str, tuple[int, tuple[int, int, int] | None]] = {
 }
 
 
-#: The data block of TASKS.md that makes a file, by the stem prefix of its name (the stems keep the task numbers of
-#: release 0.1); tests/test_task_data.py checks it against ``block_for`` of examples/make_task_data.py.
+#: The data block of the week files that makes a file, by the stem prefix of its name (the stems keep the task numbers
+#: of release 0.1); tests/test_task_data.py checks it against ``block_for`` of examples/make_task_data.py.
 DATA_BLOCKS = {"t1_": "--week 1", "t2_": "--week 2", "t3_": "--week 3", "t6_": "--week 3", "t7_": "--week 4"}
 
 
@@ -296,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
     for path in args.data:
         if not Path(path).exists():
             block = data_block(path)
-            how = "check the path (examples/make_task_data.py makes the data of TASKS.md)"
+            how = "check the path (examples/make_task_data.py makes the data of tasks/week1.md to tasks/week4.md)"
             if block:
                 how = f"make it with python examples/make_task_data.py {block}"
             print(f"{path} is missing: {how}", file=sys.stderr)

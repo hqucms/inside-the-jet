@@ -163,8 +163,8 @@ and an evaluation per epoch included. They use one 2016 six-core CPU with 6 thre
 per jet, on JetClass QCD, W and top. Laptops from 2022 on are 1.5-3 times faster. GPU numbers are for a GTX 1080 Ti.
 The toy is the course's own simulated data ([primer.md](primer.md#the-toy-and-its-files)). On the toy (about 42
 particles per jet) the course models train at PFN 8 870, `pnlite` 640, `partsmall` 240 and `partsmall_nopair` 310
-jets/s (`examples/train_tagger.py --course-models`, same CPU). The *Start of week* box of week 2 in
-[TASKS.md](../TASKS.md) trains the five course models (PFN, EFN, PN-lite, ParT-small and ParT-small without $U$) one
+jets/s (`examples/train_tagger.py --course-models`, same CPU). The *Start of week* box of
+[week 2](../tasks/week2.md) trains the five course models (PFN, EFN, PN-lite, ParT-small and ParT-small without $U$) one
 after the other into `models/course/` (`--out models/course`). This takes about 1-1.5 hours in the background, with
 `--threads` set to leave two cores free. Weeks 2 to 4 use these models.
 
