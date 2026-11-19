@@ -48,6 +48,10 @@ stored in a file records the new package version).
   in methods.md; "New to jets?" pointers to the primer at the top of physics.md, observables.md and data_format.md, and
   pointers to the machine-learning primer in models.md and methods.md.
 - Glossary entries for the basic terms of jet physics and machine learning, each with its primer section.
+- A joint-embedding predictive architecture (JEPA) in `itj.ssl` (`subjet_labels`, `subjet_target_mask`, `context_view`,
+  `EMATarget`, `ema_momentum`, `JEPAPredictor`, `jepa_loss`, `effective_rank`) for the optional part of B.2, which now
+  compares it with masked particle modelling in place of the masked-autoencoder variant, with a simple-feature
+  reference line.
 - Tests: the ID inventory, tier order and times of the week files, the weekly hour guard, the order of the data blocks,
   figure names, the mapping table, the IDs cited in the docs and code, the data commands against a golden list of
   0.1.1, the primer and the four notebooks, and that no page the primer links to before W1.1.3 states its result.

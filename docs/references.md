@@ -107,9 +107,12 @@ classes) are in [jetclass.md](jetclass.md#the-data-set); they differ in the last
 
 Every entry gives the authors, the title, the journal (or "preprint") and the arXiv number
 (`https://arxiv.org/abs/<number>`). The arXiv numbers were checked against the arXiv API on 2026-11-05. The two entries
-added in 0.2.0, Salam and Guest, Cranmer and Whiteson, were added from their journal versions. The list is grouped by
-the week of the course in which a paper is first needed. The "used in" column names the questions (IDs of the week
-files that [TASKS.md](../TASKS.md) links), tasks or weeks and the documentation pages where the paper is needed.
+added in 0.2.0, Salam and Guest, Cranmer and Whiteson, were added from their journal versions. The JEPA entries of the
+bonus (I-JEPA, J-JEPA, HEP-JEPA, JetParticle-JEPA) were checked against the arXiv API on 2026-11-19, and the venue of
+I-JEPA against the CVF open-access page; the P-JEPA talk has no arXiv number and is cited, with its authors, from its
+page. The list is grouped by the week of the course in which a paper is first needed. The "used in" column names the
+questions (IDs of the week files that [TASKS.md](../TASKS.md) links), tasks or weeks and the documentation pages where
+the paper is needed.
 
 **Start here.** Each week opens with one or two readings to start with, listed first in its table:
 
@@ -259,7 +262,11 @@ gradients before `W4.4`, and Jain and Wallace, *Attention is not Explanation*, f
 | P. Harris et al., *Re-Simulation-based Self-Supervised Learning for Pre-Training Foundation Models*, Phys. Rev. D 111, 032010 (2025), arXiv:2403.07066 | bonus |
 | Z. Zhao et al., *Large-Scale Pretraining and Finetuning for Efficient Jet Classification in Particle Physics*, preprint (2024), arXiv:2408.09343 | `B.1`, bonus |
 | C. Li et al., *Accelerating Resonance Searches via Signature-Oriented Pre-training*, preprint (2024), arXiv:2405.12972 | bonus |
-| J. Bardhan et al., *HEP-JEPA: A foundation model for collider physics using joint embedding predictive architecture*, preprint (2025), arXiv:2502.03933 | bonus |
+| J. Bardhan et al., *HEP-JEPA: A foundation model for collider physics using joint embedding predictive architecture*, preprint (2025), arXiv:2502.03933 | `B.2` |
+| M. Assran et al., *Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture* (I-JEPA), CVPR (2023), pp. 15619-15629, arXiv:2301.08243 | `B.2` |
+| S. Katel et al., *Learning Symmetry-Independent Jet Representations via Jet-Based Joint Embedding Predictive Architecture* (J-JEPA), NeurIPS 2024 workshop Machine Learning and the Physical Sciences, arXiv:2412.05333 | `B.2` |
+| G. Letellier, A. Vacheret and F. Jurie, *JetParticle-JEPA: An Efficient Self-Supervised Representation Learning method for Jet Tagging in High-Energy Physics*, preprint (2026), arXiv:2606.14813 | `B.2` |
+| S. Wang, C. Li, Q. Liu and H. Qu, *Learning powerful jet representations via self-supervision* (P-JEPA), talk at ML4Jets 2024, Paris (7 November 2024), https://indico.cern.ch/event/1386125/contributions/6139666/ | `B.2` |
 | K. He et al., *Masked Autoencoders Are Scalable Vision Learners*, CVPR (2022), arXiv:2111.06377 | `B.2` |
 | J. Devlin, M.-W. Chang, K. Lee and K. Toutanova, *BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding*, NAACL (2019), arXiv:1810.04805 | `B.2` |
 

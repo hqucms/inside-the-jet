@@ -180,6 +180,13 @@ primer section is read just before the question named.
   JetClass), which can make it fail. `W4.2.3`; [ml_primer.md](ml_primer.md#domain-shift).
 - **Dropout.** A layer that switches off random units during training (`model.train()`) and none at evaluation
   (`model.eval()`), against overfitting. `W2.3.3`; [ml_primer.md](ml_primer.md#neural-networks).
+- **Effective rank.** The number of directions a set of embeddings really spreads over: $\exp$ of the entropy of the
+  normalised singular values of the centred embeddings (`itj.ssl.effective_rank`). It is 1 for embeddings on a line and
+  at most the width of the embedding. `B.2`; [methods.md](methods.md#joint-embedding-predictive-architecture).
+- **EMA target.** A copy of a network whose weights follow the trained network as an exponential moving average (after
+  every step, $\theta_\mathrm{target} \leftarrow m\,\theta_\mathrm{target} + (1 - m)\,\theta$) instead of being trained
+  by the loss; the target encoder of a JEPA (`itj.ssl.EMATarget`). `B.2`;
+  [methods.md](methods.md#joint-embedding-predictive-architecture).
 - **Embedding.** The vector a network computes for a jet before its last linear layer (`model.embed`); the object of
   week 3. `W3.1.1`; [ml_primer.md](ml_primer.md#embeddings-and-maps), [models.md](models.md#the-model-api).
 - **Fine-tuning and linear evaluation.** Two ways to use a pretrained encoder: train all its weights on the labelled
@@ -193,6 +200,9 @@ primer section is read just before the question named.
 - **Integrated gradients.** An attribution method that integrates the gradient of the score along a straight path
   from a baseline to the input; the attributions sum to the change of the score (completeness). `W4.4.2`;
   [ml_primer.md](ml_primer.md#gradients-of-the-input), [methods.md](methods.md#attributions).
+- **JEPA.** Joint-embedding predictive architecture: self-supervised training that hides part of the input and predicts
+  what a target encoder makes of the hidden part (its representation), not the hidden features themselves. `B.2`;
+  [methods.md](methods.md#joint-embedding-predictive-architecture).
 - **Learning curve.** A metric of a tagger (here the AUC) against the size of its training set; it shows how much
   more data would help. `W2.5.3`, which defines it; [ml_primer.md](ml_primer.md#train-validation-and-test) for the
   parts it is measured on.
@@ -238,6 +248,10 @@ primer section is read just before the question named.
 - **Probe.** A small (usually linear) model trained on frozen embeddings to read out a quantity: what it can read is
   present, in that form. `W3.1.2`; [ml_primer.md](ml_primer.md#regression-and-probes),
   [methods.md](methods.md#probes).
+- **Representation collapse.** A failure of self-supervised training in which the network gives (nearly) the same
+  representation to every input, which can make the loss small without learning anything. In dimensional collapse the
+  representations differ only along a few directions; the effective rank shows it. `B.2`;
+  [methods.md](methods.md#joint-embedding-predictive-architecture).
 - **Saliency.** The gradient of the score with respect to the inputs, the simplest attribution. `W4.4.1`;
   [ml_primer.md](ml_primer.md#gradients-of-the-input), [methods.md](methods.md#attributions).
 - **Selectivity.** The score of a probe minus the score of the same probe on a control task. `W3.1.2`;

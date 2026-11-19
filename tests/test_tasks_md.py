@@ -358,10 +358,14 @@ ANSWER_PHRASES = re.compile(
 )
 METRIC_VALUE = re.compile(
     r"\b(?:AUC|R_\{?50\}?|R50|accuracy|JSD|selectivity|R\^2)\b[^.\n]{0,25}?"
-    r"(?:=|\\approx|≈|\bof about\b|\bis about\b|\bnear\b|\bat about\b|\baround\b)\s*\$?\d"
+    r"(?:=|\\approx|≈|\bof about\b|\bis about\b|\bnear\b|\bat about\b|\baround\b|\bof\b)\s*\$?\d"
 )
 #: Expected-behaviour sentences that check the set-up, not an answer (the rendering rule allows them).
-SET_UP_CHECKS = ("after 30 steps expect an accuracy of about", "an\naccuracy near 1/3, chance for three classes")
+SET_UP_CHECKS = (
+    "after 30 steps expect an accuracy of about",
+    "an\naccuracy near 1/3, chance for three classes",
+    "W-against-QCD AUC of 0.92 with 1 000 labels",  # B.2: the simple-feature line next to the encoders
+)
 
 
 @pytest.mark.parametrize("path", [TASKS, *WEEK_FILES], ids=lambda p: p.name)

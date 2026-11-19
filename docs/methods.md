@@ -368,3 +368,38 @@ the hard part. A regression predicts the conditional mean of each target. The pa
 the hidden particles (2401.13537), or compare such targets with continuous ones and generative heads (2409.12589).
 Evaluate the encoder with the linear evaluation above, on the class token and on the mean of the last particle block.
 The masked loss never trains the class-attention blocks.
+
+## Joint-embedding predictive architecture
+
+*In words.* Masked particle modelling asks the network to redraw the hidden particles. A joint-embedding predictive
+architecture (JEPA) asks it instead what a second network makes of them: it predicts *representations* of the hidden
+part, not its features. The hope is that the network spends its effort on what matters for the jet as a whole and not
+on the exact momentum of every soft particle.
+
+A JEPA (I-JEPA for images, 2301.08243; J-JEPA, 2412.05333, HEP-JEPA, 2502.03933 and JetParticle-JEPA, 2606.14813 for
+jets; the P-JEPA talk of ML4Jets 2024 in
+[references.md](references.md#bonus-foundation-models-and-masked-particle-modelling)) has three networks. The **context
+encoder** sees part of the jet and the **target encoder** all of it. A small **predictor** turns the output of the
+context encoder into a guess of the target encoder's output at the hidden particles. In `itj.ssl` the hidden part is one
+exclusive kT subjet of every jet (`subjet_target_mask`), so one of the two prongs of a W jet. `context_view` rebuilds
+the other particles as a jet of their own. Simply masking the prong would not hide it: the visible particles keep their
+momentum fractions of the full jet, and their sum gives the hidden fraction away. `JEPAPredictor` gets the context
+encoder's output (for every particle and its class token) and the positions ($\Delta\eta$, $\Delta\phi$) of all
+particles of the jet, context and hidden, in the frame of the context. `jepa_loss` is the mean squared distance to the
+target encoder's output, after a layer norm of each target vector (so a predictor that always outputs 0 scores 1).
+
+**Why an EMA target and a stop-gradient.** If both encoders were one network trained by the loss, the easiest way to
+make the loss zero would be to give every particle of every jet the same vector. This is **representation collapse**:
+a small loss but a representation that knows nothing. The target encoder therefore gets no gradient from the loss (a
+stop-gradient). It is an exponential moving average (EMA) of the context encoder instead: after every step, each of its
+weights moves a small fraction $1 - m$ of the way towards the context encoder's weight (`EMATarget`, with the momentum
+$m$ rising from 0.996 to 1 by `ema_momentum`). This asymmetry, with the predictor in between, makes the constant
+solution hard to reach in practice, but nothing forbids it. Collapse can also be partial (dimensional collapse): the
+representations still differ between jets, but only along a few directions. `effective_rank` counts these directions,
+from 1 (all jets on a line) to the width of the representation. Watch it during pretraining, next to the loss.
+
+Whether this JEPA beats masked particle modelling at the budget of the course (30 000 jets, 936 steps) is the question
+of **B.2**; the papers pretrain on far more jets for far longer. A small loss alone does not show that the encoder
+learned anything, because the predictor also sees where the particles are. Compare the loss with that of a predictor
+that sees only the positions, and with that of a predictor on a frozen untrained encoder. One more thing to think
+about: the context encoder never sees a whole jet, so the statistics of its input BatchNorm come from half-jets.
