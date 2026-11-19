@@ -202,7 +202,7 @@ class EFN(Tagger):
         )
 
     def filters(self, *, extent: float = 0.8, bins: int = 64) -> np.ndarray:
-        """Evaluate the filters Phi_a(Delta eta, Delta phi) on a grid (T3.3, ``plot.efn_filters``).
+        """Evaluate the filters Phi_a(Delta eta, Delta phi) on a grid (W3.2.2, ``plot.efn_filters``).
 
         Parameters
         ----------

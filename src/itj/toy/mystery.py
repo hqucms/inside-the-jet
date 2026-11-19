@@ -1,4 +1,4 @@
-"""Planted shortcuts for the bonus task T7.2 (``jetgen generate --mystery``).
+"""Planted shortcuts for the bonus question B.3 (``jetgen generate --mystery``).
 
 A planted shortcut is one configuration field changed for one process only: the jets of that process then carry a
 feature that a tagger can learn although it has nothing to do with the physics of the class. ``--mystery`` picks
@@ -10,7 +10,7 @@ prints a placeholder) and cannot be read with a base64 decoder. The run statisti
 times of ``busy_w``) go into the scrambled entry as well (:func:`plant`). :func:`reveal` unscrambles it
 (``jetgen info --reveal``).
 
-The scrambling is not encryption. Reading this module spoils T7.2: the mapping from the seed to the shortcut and
+The scrambling is not encryption. Reading this module spoils B.3: the mapping from the seed to the shortcut and
 the default key are public. An instructor who wants a real hunt sets the environment variable ``ITJ_MYSTERY_KEY``
 to a private integer before generating the students' files; both the mapping and the scrambling then depend on it,
 and ``--reveal`` needs the same key (``docs/physics.md#planted-shortcuts``).

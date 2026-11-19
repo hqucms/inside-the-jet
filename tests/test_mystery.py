@@ -1,4 +1,4 @@
-"""Planted shortcuts of T7.2: the choice from the seed, one process changed, hidden from describe, reveal."""
+"""Planted shortcuts of B.3: the choice from the seed, one process changed, hidden from describe, reveal."""
 
 import base64
 import json

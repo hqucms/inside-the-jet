@@ -6,9 +6,9 @@ both views to vectors ``z``, and :func:`nt_xent` pulls the two views of a jet to
 vectors of the batch away. :func:`alignment` and :func:`uniformity` (Wang and Isola, arXiv:2005.10242) monitor the
 two halves of that objective; :func:`linear_eval` measures what the frozen encoder learned with a logistic regression
 on few or all labels. :func:`mask_particles` and :class:`MaskedParticleDecoder` prepare masked-particle modelling
-(T7.1).
+(B.2).
 
-The pretraining loop itself is what the students write (T6.3).
+The pretraining loop itself is what the students write (W3.4.3).
 
 Examples
 --------
@@ -80,7 +80,7 @@ class JetCLRAugment:
 
     Examples
     --------
-    ``view = JetCLRAugment()(data, rng)``; ``JetCLRAugment(collinear_frac=0.0)`` for the T6.6 ablation.
+    ``view = JetCLRAugment()(data, rng)``; ``JetCLRAugment(collinear_frac=0.0)`` for the W4.3.4 ablation.
     """
 
     def __init__(
@@ -330,7 +330,7 @@ def linear_eval(
 def mask_particles(
     batch: JetBatch, *, frac: float = 0.3, generator: torch.Generator | None = None, drop: bool = False
 ) -> tuple[JetBatch, torch.Tensor, torch.Tensor]:
-    """Hide a random fraction of the particles of every jet for masked-particle modelling (T7.1).
+    """Hide a random fraction of the particles of every jet for masked-particle modelling (B.2).
 
     In every jet ``max(1, round(frac * n))`` real particles are chosen; their features, points and vectors are set to
     0 (also in the wrap-padded copies of them, so that nothing leaks). With ``drop=False`` the particle mask is
@@ -387,7 +387,7 @@ def mask_particles(
 
 
 class MaskedParticleDecoder(nn.Module):
-    """A decoder for masked-particle modelling that knows the slot of every particle (T7.1).
+    """A decoder for masked-particle modelling that knows the slot of every particle (B.2).
 
     A learned embedding of the slot index (the pT rank, since the particles are stored in pT order) is added to the
     projected encoder output at every slot; without it all masked slots of a jet would get the same prediction. The

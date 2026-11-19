@@ -104,7 +104,7 @@ def extract(
     if not callable(getattr(model, "trace", None)):
         raise TypeError(
             f"extract needs an itj Tagger with a trace method, not a {type(model).__name__}: copy the weights of your "
-            "own model into build_model(...) with load_state_dict (the key map of T2.4)"
+            "own model into build_model(...) with load_state_dict (the key map of W2.4.2)"
         )
     if layers not in ("embedding", "all"):
         raise ValueError(f"layers must be 'embedding' or 'all', got {layers!r}")

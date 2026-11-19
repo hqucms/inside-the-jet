@@ -116,7 +116,7 @@ def build_parser() -> argparse.ArgumentParser:
     info.add_argument("--columns", action="store_true", help="list the columns with type, units and description")
     info.add_argument("--provenance", action="store_true", help="print the full provenance (incl. stage times)")
     info.add_argument(
-        "--reveal", action="store_true", help="decode the planted shortcut of a --mystery file (spoils T7.2)"
+        "--reveal", action="store_true", help="decode the planted shortcut of a --mystery file (spoils B.3)"
     )
     _add_logging_options(info)
 
@@ -261,7 +261,7 @@ def _add_generate(commands: Any) -> None:
         metavar="PROC:KEY=VALUE",
         help="change a parameter for one process only, e.g. wqq:pi0_fraction=0.40 (repeatable)",
     )
-    gen.add_argument("--mystery", action="store_true", help="plant a hidden shortcut drawn from the seed (bonus T7.2)")
+    gen.add_argument("--mystery", action="store_true", help="plant a hidden shortcut drawn from the seed (bonus B.3)")
     out = gen.add_argument_group("output")
     out.add_argument(
         "-o",

@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -13,8 +14,13 @@ SAMPLE = Path(__file__).parent / "data" / "jetclass_sample.parquet"
 KERNEL = {"display_name": "Python (inside-the-jet)", "name": "inside-the-jet"}
 
 
-def test_both_notebooks_exist():
-    assert [p.name for p in NOTEBOOKS] == ["00_quickstart.ipynb", "01_jetclass.ipynb"]
+#: The notebooks of the course, by the week that first needs them: 1 (00_primer, 00_quickstart), 4 (01_jetclass)
+#: and 2 (02_first_network).
+NAMES = ["00_primer.ipynb", "00_quickstart.ipynb", "01_jetclass.ipynb", "02_first_network.ipynb"]
+
+
+def test_the_four_notebooks_exist():
+    assert [p.name for p in NOTEBOOKS] == NAMES
 
 
 @pytest.mark.parametrize("path", NOTEBOOKS, ids=lambda p: p.stem)
@@ -26,7 +32,7 @@ def test_format_and_stripped(path):
     ids = [cell["id"] for cell in nb["cells"]]
     assert len(set(ids)) == len(ids)
     assert nb["cells"][0]["cell_type"] == "markdown"
-    assert "".join(nb["cells"][0]["source"]).startswith("# Quick start: ")
+    assert re.match(r"# \S", "".join(nb["cells"][0]["source"])), "the first cell is a level-1 title"
     for cell in nb["cells"]:
         assert cell["metadata"] == {}
         if cell["cell_type"] == "code":
@@ -65,5 +71,5 @@ def test_notebook_runs(path, tmp_path, monkeypatch):
         assert "check identities: True" in text
         assert "same columns: True" in text
         assert (tmp_path / "data" / "quickstart_notebook.parquet").exists()
-    else:
+    elif path.stem == "01_jetclass":
         assert "Using the 150 JetClass jets of tests/data instead." in text

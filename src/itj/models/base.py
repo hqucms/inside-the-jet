@@ -166,7 +166,7 @@ class Tagger(nn.Module):
         """Re-initialise every weight as a new model of the same configuration built with ``torch.manual_seed(seed)``.
 
         Running statistics of the BatchNorm layers are reset too. Used for the random-weight control of probes
-        (T3.2, T6.5); the global torch random state is not changed.
+        (W3.1.2, W3.4.7); the global torch random state is not changed.
         """
         with torch.random.fork_rng(devices=[]):
             torch.manual_seed(seed)

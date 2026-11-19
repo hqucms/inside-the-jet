@@ -1,11 +1,15 @@
 # Data format
 
-Every run of `jetgen generate` (or `save()` in Python) writes one Parquet file with one row per jet. This page describes
-format version 1, written by `itj` 0.1.0 and 0.1.1. The columns are those of JetClass, with the same names, dtypes and
-meaning, followed by the toy's truth columns, so that one reader (`itj.io.load`), one set of network inputs and one
-weaver data configuration work on the toy files and on the JetClass files alike. Below, `N` is the number of jets. The
-physics behind the stored quantities is in [physics.md](physics.md), the observables in
-[observables.md](observables.md).
+**New to jets?** Start with [the primer](primer.md), *Jets from zero*: its [section 10](primer.md#the-toy-and-its-files)
+explains in words what a file holds, the padding and the chunks.
+
+Every run of `jetgen generate` (or `save()` in Python) writes one Parquet file with one row per jet. Parquet is a
+standard file format for tables. This page describes format version 1, written by `itj` 0.1.0 to 0.2.0. The columns are
+those of JetClass (the public data set of simulated jets, see [jetclass.md](jetclass.md)), with the same names, dtypes
+(data types) and meaning. The toy's truth columns follow them. The toy files and the JetClass files are read by one
+reader (`itj.io.load`). They share one set of network inputs and one data configuration of weaver (the training
+framework of ParT and the JetClass paper). Below, `N` is the number of jets. The physics behind the stored quantities is
+in [physics.md](physics.md), the observables in [observables.md](observables.md).
 
 ```text
 file.parquet
@@ -20,8 +24,9 @@ file.parquet
 
 ## Reading the data
 
-In Python, `load` returns the same `JetData` object as `generate`: a column store keyed by the branch names, with a
-NumPy array per jet column and a `Ragged` array (flat values and offsets) per jagged column.
+In Python, `load` returns the same `JetData` object as `generate`. It is a column store keyed by the branch names. A
+jet column (one value per jet) is a NumPy array. A jagged column (a different number of values per jet, such as the
+particles) is a `Ragged` array of flat values and offsets.
 
 ```python
 from itj.io import load
@@ -38,12 +43,21 @@ jet.particles_frame()  # its particles as a pandas DataFrame
 data.config, data.provenance["seed"]  # the configuration and how the file was made
 ```
 
-`load` also reads JetClass files (Parquet, or ROOT with the `analysis` extra), several files at once (a list or a
-glob, concatenated in sorted order with a per-jet `file_index`), a subset of the columns (`columns=[...]`), only the
-JetClass columns (`truth=False`), one part of the standard split (`part="train"`, `"val"` or `"test"`, see
-[Split files for weaver](#split-files-for-weaver)) and at most `max_jets` jets per file. Large files are best read in
-chunks: `for chunk in data.chunks(2000): ...`. `data.to_pandas()` gives a DataFrame of the jet columns
-(`level="particle"`: one row per particle).
+`load` also reads:
+
+- JetClass files (Parquet, or ROOT with the `analysis` extra);
+- several files at once (a list or a glob, concatenated in sorted order with a per-jet `file_index`);
+- a subset of the columns (`columns=[...]`), or only the JetClass columns (`truth=False`);
+- one part of the standard split (`part="train"`, `"val"` or `"test"`, see
+  [Split files for weaver](#split-files-for-weaver));
+- at most `max_jets` jets per file.
+
+Large files are best read in chunks: `for chunk in data.chunks(2000): ...`. `data.to_pandas()` gives a DataFrame of the
+jet columns (`level="particle"`: one row per particle).
+
+The data files of the course (`data/t1_*.parquet`, `t2_`, `t3_`, `t6_`, `t7_`) keep the names of release 0.1, where the
+number was that of the task. They are names, not question IDs. [TASKS.md](../TASKS.md) says which week makes each
+file (`python examples/make_task_data.py --week 1` to `--week 4`).
 
 `jetgen info FILE` prints the counts per process, the mean multiplicity, the preset, the seed and the wall time
 (`--columns`: every column with its dtype; `--provenance`: the full provenance). The files are plain Parquet, so any
@@ -60,8 +74,8 @@ print(table.schema.field("part_px").metadata)  # {b"units": b"GeV", b"descriptio
 
 ## Ragged columns and offsets
 
-Jets have different numbers of particles, so the values of a jagged column for all jets are stored one after the
-other, and `offsets` (int64, `N + 1` entries, `offsets[0] = 0`) says where each jet starts: the particles of jet `i` are
+Jets have different numbers of particles. The values of a jagged column for all jets are therefore stored one after the
+other, and `offsets` (int64, `N + 1` entries, `offsets[0] = 0`) says where each jet starts. The particles of jet `i` are
 the rows `offsets[i]:offsets[i + 1]`. All columns of one group (particles, prongs, partons, emissions, Lund emissions)
 share their offsets. The same holds in pyarrow, and `Ragged` exposes them:
 
@@ -82,27 +96,29 @@ adds columns (your own observables), and `data.drop("truth_")` removes columns b
 ## JetClass branches
 
 The 41 branches of JetClass, in the JetClass order and with the JetClass dtypes (jagged branches are
-`large_list<... not null>` in Arrow, every field `not null`):
+`large_list<... not null>` in Arrow, every field `not null`). The columns in bold are those that the questions of week 1
+use. The others come in later weeks: the particle types and impact parameters as network inputs from week 2 on, the aux
+branches with JetClass in week 4.
 
 | column | dtype | units | content |
 |---|---|---|---|
-| `part_px`, `part_py`, `part_pz`, `part_energy` | large_list<float32> | GeV | four-momentum, sorted by $p_T$, descending |
-| `part_deta` | large_list<float32> | | $s(\eta_i - \eta_\mathrm{jet})$, $s = +1$ if $\eta_\mathrm{jet} \ge 0$ else $-1$ |
-| `part_dphi` | large_list<float32> | rad | $\mathrm{wrap}(\phi_i - \phi_\mathrm{jet})$ |
+| **`part_px`, `part_py`, `part_pz`, `part_energy`** | large_list<float32> | GeV | four-momentum, sorted by $p_T$, descending |
+| **`part_deta`** | large_list<float32> | | $s(\eta_i - \eta_\mathrm{jet})$, $s = +1$ if $\eta_\mathrm{jet} \ge 0$ else $-1$ |
+| **`part_dphi`** | large_list<float32> | rad | $\mathrm{wrap}(\phi_i - \phi_\mathrm{jet})$ |
 | `part_d0val`, `part_d0err`, `part_dzval`, `part_dzerr` | large_list<float32> | mm | impact parameters and their errors; 0 for neutrals |
 | `part_charge` | large_list<float32> | | -1, 0, 1 |
 | `part_isChargedHadron`, `part_isNeutralHadron`, `part_isPhoton`, `part_isElectron`, `part_isMuon` | large_list<int32> | | one-hot particle type (all 0 at `partons` and `shower`) |
-| `label_QCD` | float32 | | 1 for `qcd`, `q`, `g` |
+| **`label_QCD`** | float32 | | 1 for `qcd`, `q`, `g` |
 | `label_Hbb`, `label_Hcc`, `label_Hgg`, `label_H4q`, `label_Hqql` | bool | | always false in the toy |
-| `label_Zqq`, `label_Wqq`, `label_Tbqq`, `label_Tbl` | int32 | | `label_Wqq` for `wqq`, `label_Tbqq` for `tbqq` |
-| `jet_pt`, `jet_eta`, `jet_phi`, `jet_energy` | float32 | GeV, -, rad, GeV | of the four-vector sum of the constituents |
-| `jet_nparticles` | float32 | | number of constituents |
-| `jet_sdmass` | float32 | GeV | soft-drop mass (C/A, $\beta = 0$, $z_\mathrm{cut} = 0.1$, $R_0 = 0.8$) |
-| `jet_tau1`..`jet_tau4` | float32 | | N-subjettiness ($\beta = 1$, $R_0 = 0.8$; toy: WTA-kT axes; JetClass: probably one-pass minimised kT axes, reproduced to about 1 %); 0 if $N \ge$ the number of particles |
+| `label_Zqq`, **`label_Wqq`**, **`label_Tbqq`**, `label_Tbl` | int32 | | `label_Wqq` for `wqq`, `label_Tbqq` for `tbqq` |
+| **`jet_pt`**, **`jet_eta`**, `jet_phi`, `jet_energy` | float32 | GeV, -, rad, GeV | of the four-vector sum of the constituents |
+| **`jet_nparticles`** | float32 | | number of constituents |
+| **`jet_sdmass`** | float32 | GeV | soft-drop mass (C/A, $\beta = 0$, $z_\mathrm{cut} = 0.1$, $R_0 = 0.8$) |
+| **`jet_tau1`..`jet_tau3`**, `jet_tau4` | float32 | | N-subjettiness ($\beta = 1$, $R_0 = 0.8$; toy: WTA-kT axes; JetClass: probably one-pass minimised kT axes, reproduced to about 1 %); 0 if $N \ge$ the number of particles |
 | `aux_genpart_eta`, `aux_genpart_phi`, `aux_genpart_pid`, `aux_genpart_pt` | float32 | | the resonance (W: ±24, top: ±6, sign random); all 0 for QCD |
 | `aux_truth_match` | float32 | | 50 QCD, 21 W, 11 top |
 
-The label dtypes are mixed exactly as in JetClass; `data.labels()` and `itj.features.labels(data, "jets3")` return the
+The label dtypes are mixed exactly as in JetClass. `data.labels()` and `itj.features.labels(data, "jets3")` return the
 class index (QCD 0, W 1, top 2) as int64. [jetclass.md](jetclass.md#field-names) describes the same branches from
 the JetClass side.
 
@@ -127,7 +143,7 @@ removes them. **Never feed a `truth_*` column to a tagger**: it holds the answer
 |---|---|---|
 | `truth_event_id` | int64 | `first_event_id` + row |
 | `truth_process` | int8 | index in `itj.toy.PROCESSES` = ("qcd", "wqq", "tbqq", "q", "g") |
-| `truth_init_pid` | int32 | initiator: 1 quark (any flavour), 21 gluon, 24 W, 6 top |
+| `truth_init_pid` | int32 | seed parton: 1 quark (any flavour), 21 gluon, 24 W, 6 top |
 | `truth_nprongs` | int8 | 1, 2, 3 |
 | `truth_seed_pt`, `truth_seed_eta`, `truth_seed_phi` | float32 | the seed parton or resonance (lab) [GeV, -, rad] |
 | `truth_mass` | float32 | Breit-Wigner mass [GeV] (0 for QCD) |
@@ -135,7 +151,7 @@ removes them. **Never feed a `truth_*` column to a tagger**: it holds the answer
 | `truth_dr_min`, `truth_dr_max` | float32 | smallest and largest pairwise $\Delta R$ of the decay quarks; NaN for QCD |
 | `truth_n_emissions`, `truth_n_primary` | int16 | accepted branchings; primary ones, summed over the prongs |
 | `truth_lnkt_max` | float32 | $\ln(k_t/\mathrm{GeV})$ of the hardest primary emission; NaN if none |
-| `truth_prong_px`, `_py`, `_pz`, `_energy`, `_deta`, `_dphi` | large_list<float32> | decay partons (QCD: the initiator); top: 0 = b, 1-2 = W quarks by energy; W: by energy |
+| `truth_prong_px`, `_py`, `_pz`, `_energy`, `_deta`, `_dphi` | large_list<float32> | decay partons (QCD: the seed parton); top: 0 = b, 1-2 = W quarks by energy; W: by energy |
 | `truth_prong_pid` | large_list<int32> | PDG id (±1..5, 21) |
 | `truth_part_prong` | large_list<int8> | prong of each particle, -1 for UE |
 | `truth_part_parton` | large_list<int16> | index into `truth_parton_*`, -1 for UE |
@@ -202,30 +218,31 @@ A file made by `jetgen merge` has `provenance["merged"]` = one entry (file, seed
 
 ## Merging and sharded generation
 
-`jetgen merge FILE... -o OUT` (or `itj.io.merge(paths, out)`) concatenates files in the given order (`--shuffle
---seed S` shuffles the jets). It refuses inputs with the same seed (their jets would repeat the same random numbers)
-and inputs whose `truth_event_id` ranges overlap: give every shard its own seed and its own `--first-event-id` range,
-or pass `--renumber`. Inputs with different configurations merge (their configurations go to the provenance).
-[examples/cluster](../examples/cluster/README.md) shows the workflow.
+`jetgen merge FILE... -o OUT` (or `itj.io.merge(paths, out)`) concatenates files in the given order
+(`--shuffle --seed S` shuffles the jets). It refuses inputs with the same seed, since their jets would repeat the same
+random numbers. It also refuses inputs whose `truth_event_id` ranges overlap. Give every shard (a part of a data set
+made by one job) its own seed and its own `--first-event-id` range, or pass `--renumber`. Inputs with different
+configurations merge (their configurations go to the provenance). [examples/cluster](../examples/cluster/README.md)
+shows the workflow.
 
 ## Split files for weaver
 
-All of `itj` uses one split of every file: the first 20 % of the rows are the **test** part, the next 10 % the
-**val** part and the rest the **train** part (boundaries `int(0.2 n)` and `int(0.3 n)` for a file of `n` rows),
-applied per file. `load(path, part="test")` and `itj.features.split(data)` (per `file_index`) give it in Python;
+All of `itj` uses one split of every file, applied per file. The first 20 % of the rows are the **test** part, the
+next 10 % the **val** part and the rest the **train** part (boundaries `int(0.2 n)` and `int(0.3 n)` for a file of
+`n` rows). `load(path, part="test")` and `itj.features.split(data)` (per `file_index`) give it in Python;
 `itj.jetclass.load_jetclass(part=...)` on JetClass.
 
-weaver cannot apply this split itself: it reads all files of a fetch, concatenates them and only then applies a
-`selection`, so an index-based selection in the YAML would mix the files and train on test jets of all but the first
-file. `jetgen split` therefore writes the three parts as files, row for row what `load(part=...)` returns, with every
-column, the metadata and the row groups:
+weaver cannot apply this split itself. It reads all files of a fetch, concatenates them and only then applies a
+`selection`. An index-based selection in the YAML would therefore mix the files and train on test jets of all but the
+first file. `jetgen split` therefore writes the three parts as files, row for row what `load(part=...)` returns, with
+every column, the metadata and the row groups:
 
 ```bash
 jetgen split data/t2_detector.parquet --out-dir data/t2_split      # -> data/t2_split/{train,val,test}/t2_detector.parquet
 ```
 
-The packaged weaver data configurations (`jetgen configs` prints their paths) have no selection and run unchanged on
-toy and JetClass files: `jets3_kin.yaml`, `jets3_kinpid.yaml` and `jets3_full.yaml` (three classes, QCD, W and top)
+The packaged weaver data configurations (`jetgen configs` prints their paths) have no selection and run unchanged on toy
+and JetClass files. They are `jets3_kin.yaml`, `jets3_kinpid.yaml` and `jets3_full.yaml` (three classes, QCD, W and top)
 and the stock ten-class `JetClass_kin.yaml`, `JetClass_kinpid.yaml` and `JetClass_full.yaml`. Their inputs are those of
 [models.md](models.md#inputs); [examples/weaver](../examples/weaver/README.md) has the commands.
 
@@ -302,10 +319,10 @@ observers:
 weights:
 ```
 
-`jets3_kinpid.yaml` and `jets3_full.yaml` differ only in `pf_features` (the particle types, and for `full` the impact
-parameters, with `part_d0: np.tanh(part_d0val)` and `part_dz: np.tanh(part_dzval)` added to `new_variables`), exactly
-as `JetClass_kinpid.yaml` and `JetClass_full.yaml`, which are byte-for-byte copies of the ParT repository at commit
-`fa63c86`. `itj.features.FEATURE_SETS` holds the same variables in the same order (a test checks all six files).
+`jets3_kinpid.yaml` and `jets3_full.yaml` differ only in `pf_features`: the particle types, and for `full` the impact
+parameters, with `part_d0: np.tanh(part_d0val)` and `part_dz: np.tanh(part_dzval)` added to `new_variables`. The same
+holds for `JetClass_kinpid.yaml` and `JetClass_full.yaml`, which are byte-for-byte copies of the ParT repository at
+commit `fa63c86`. `itj.features.FEATURE_SETS` holds the same variables in the same order (a test checks all six files).
 
 ## Storage details
 
@@ -328,8 +345,10 @@ Analysis code must survive these features of the JetClass files (and the toy rep
 - **`jet_nparticles` is float32.**
 - **Particles outside the cone**: 0.5-0.7 % of the JetClass particles have $\Delta R > 0.8$ from the jet axis (with
   $|\Delta\eta|$ up to 3.1): never assume $\Delta R < R$.
-- **`jet_energy`** differs from the sum of the particle energies by up to 3.8 % and `jet_eta` from the $\eta$ of that
-  sum by up to 0.013 (`jet_pt` and `jet_phi` agree to float32 precision); `itj.augment.recompute` and
-  `itj.observables.jet_branches` always use the sum of the constituents.
-- **The reco cut** $500 < p_T^\mathrm{jet} < 1000$ GeV and $|\eta_\mathrm{jet}| < 2$: toy files have no such cut;
-  apply `itj.features.jetclass_selection(data)` before comparing.
+- **`jet_energy`** differs from the sum of the particle energies by up to 3.8 %. `jet_eta` differs from the $\eta$ of
+  that sum by up to about 0.03, and 0.75 % of the jets differ by more than 0.013. `jet_pt` and `jet_phi` agree to
+  float32 precision. `itj.augment.recompute` and `itj.observables.jet_branches` always use the sum of the constituents.
+- **The reco cut** $500 < p_T^\mathrm{jet} < 1000$ GeV and $|\eta_\mathrm{jet}| < 2$: toy files have no such cut.
+  Apply `itj.features.jetclass_selection(data)` before comparing. It applies the $p_T$ cut only, so about 1 % of the
+  selected toy jets have $|\eta_\mathrm{jet}|$ slightly above 2 (up to about 2.1). This does not matter for the network
+  inputs (relative coordinates) and matters little for the observables.

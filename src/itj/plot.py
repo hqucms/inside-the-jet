@@ -11,7 +11,7 @@ Figure for the multi-panel figures (:func:`ladder`, :func:`efn_filters`).
 * :func:`roc_curves`, :func:`curves`, :func:`history`: ROC curves (rejection on a log axis), scans and learning
   curves;
 * :func:`attention_matrix`, :func:`attribution_display`, :func:`efn_filters`, :func:`cka_heatmap`: the
-  interpretability figures of T3 and T5.
+  interpretability figures of weeks 3 and 4.
 
 Colours come from :data:`palette` (the Okabe-Ito colours, distinguishable with colour-vision deficiencies) with named
 roles; continuous values use ``viridis`` (unsigned) or ``RdBu_r`` (signed, centred on 0). Plain matplotlib

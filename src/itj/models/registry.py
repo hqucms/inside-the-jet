@@ -146,7 +146,7 @@ def save_model(model: Tagger, path: str | os.PathLike[str], *, extra: dict[str, 
     if not isinstance(model, Tagger):
         raise TypeError(
             f"save_model saves an itj Tagger, not a {type(model).__name__}: copy the weights of your own model into "
-            "build_model(...) with load_state_dict (the key map of T2.4) and save that, or use torch.save"
+            "build_model(...) with load_state_dict (the key map of W2.4.2) and save that, or use torch.save"
         )
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -190,7 +190,7 @@ def load_model(
         A file of :func:`save_model`, or a weaver checkpoint (``--model-prefix`` ``*_state.pt``) of a ParT or
         ParticleNet trained with the networks of ``examples/weaver/networks``.
     name : str, optional
-        The :data:`MODEL_PRESETS` architecture of a bare state dict (e.g. ``"partsmall"`` for the T4.6 weaver run);
+        The :data:`MODEL_PRESETS` architecture of a bare state dict (e.g. ``"partsmall"`` for the W4.2.7 weaver run);
         ``n_classes`` and ``feature_set`` are read from the weights unless given.
     device : str or torch.device
         Where to put the model.

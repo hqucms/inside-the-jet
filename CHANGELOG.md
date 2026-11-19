@@ -7,6 +7,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-19
+
+The course is re-paced for undergraduates with no prior knowledge of jets who work on it 2-3 days per week: four weeks
+instead of two, every task in warm-up, core and stretch questions, a primer on jets and a ladder for machine learning.
+The question IDs are renumbered by week (`W<week>.<task>.<question>`, bonus `B.1` to `B.5`);
+[docs/id_mapping_0.2.md](docs/id_mapping_0.2.md) maps every question ID of 0.1.x to its 0.2.0 ID or IDs and back, for
+remapping answers, solutions and notes. The toy, its default output and the API of `itj` are unchanged: the 26 data
+commands are the same, only grouped by week, so every column of every data file is bit-identical (the provenance
+stored in a file records the new package version).
+
+### Added
+
+- `docs/primer.md`, *Jets from zero*, the first unit of the course: units, four-vectors and invariant mass, collider
+  coordinates, the particles, what a jet is, boosted W and top jets, the parton shower, hadronisation and the
+  underlying event, what a detector sees, the toy and its files, histograms and errors and a first look at the
+  observables, each section with check-yourself questions. Task W1.1 holds its ten guided exercises on the toy (six
+  on the core path), each naming the primer sections to read just before it; `notebooks/00_primer.ipynb` works
+  through the same tools on other jets than the exercises.
+- `docs/ml_primer.md`, *Machine learning from zero*, the ladder of weeks 2-4 in eleven sections (a tagger as a
+  function, train, validation and test, trees and boosting, neural networks, PyTorch in one page, networks on
+  particles, embeddings, regression and probes, learning without labels, domain shift, gradients of the input), each
+  read just before the question that uses it, with check-yourself questions; and `notebooks/02_first_network.ipynb`, a
+  first neural network in two parts on 6 000 generated jets, under a minute of CPU (W2.3.1 tensors, gradients and a
+  logistic regression by hand; W2.3.2 the same as an `nn.Module`, an MLP, its training loop, overfitting and the
+  learning rate); a one-tree warm-up before the boosted decision trees (W2.2.1).
+- Three figures of the primer, made by `examples/make_doc_figures.py` (`--only primer_coordinates`, `primer_boosted`,
+  `primer_lund`): the collider coordinates, a boosted W decay and the primary Lund plane of one jet.
+- `docs/id_mapping_0.2.md`: the ID scheme, the mapping from 0.1.x to 0.2.0 (split questions part by part) and the
+  reverse index.
+- Per week in TASKS.md: why this week, the thread, the concepts in order of use, the week at a glance, a *Start of
+  week* box, a day plan for two core days (or three shorter ones), a check-in at the end of day 1, fallbacks for a
+  student who is behind (with the time saved and what is lost), the first stretch picks and a weekly summary; a
+  realistic time for every question, its reading included; a hand-in by ID in `answers/week<k>.md`.
+- Fifteen new or partly new questions, the steps of the ladders: W1.1.1-W1.1.3, W1.1.6-W1.1.10, W1.2.3, W2.1.1,
+  W2.2.1, W2.3.1, W2.3.2, W2.4.1 and W4.1.1.
+- *In words* leads (two or three sentences before the formulas) in observables.md (soft drop, N-subjettiness, energy
+  correlation functions, the Lund plane, IRC safety, numerical IRC tests) and methods.md (probes, linear CKA,
+  attributions, attention, mass sculpting, contrastive learning, linear evaluation); the shape of the pretraining loop
+  in methods.md; "New to jets?" pointers to the primer at the top of physics.md, observables.md and data_format.md, and
+  pointers to the machine-learning primer in models.md and methods.md.
+- Glossary entries for the basic terms of jet physics and machine learning, each with its primer section.
+- Tests: the ID inventory, tier order and times of TASKS.md, the weekly hour guard, the order of the data blocks,
+  figure names, the mapping table, the IDs cited in the docs and code, the data commands against a golden list of
+  0.1.1, the primer and the four notebooks, and that no page the primer links to before W1.1.3 states its result.
+
+### Changed
+
+- TASKS.md in four weeks: *What is a jet?* (the set-up, jets from zero, the ladder of the toy on many jets, the jet
+  mass, counting prongs); *Taggers, from cuts to transformers*; *What do taggers learn?* (representations and probes,
+  what the taggers use, IRC safety and symmetries, learning without labels); *Real jets, and where does a tagger
+  look?* (JetClass, the pretrained ParT, IRC tests of networks, attributions on the toy, ending on the real ParT). IRC
+  safety moves from week 1 to week 3, next to the augmentations that use the same functions; JetClass and
+  interpretability share week 4, with every tool checked on the toy before it is used on the real ParT; the JetClass
+  dictionary moves from the set-up to week 4. The core path is about 13-14 hours a week (13.75, 12.75, 13.5 and 12.75
+  h, reading and writing up included: two days of about 6.5-7 hours or three shorter days, with fallbacks marked
+  *two-day* for a week of two shorter days); about 98.5 hours of stretch and 24.5 hours of bonus are on offer.
+- Week 2 trains the five course models (PFN, EFN, PN-lite, ParT-small and ParT-small without the pair bias) with one
+  command in its *Start of week* box (`examples/train_tagger.py --course-models --out models/course --threads N`), one
+  after the other in the background; they replace the two ParT-small trainings side by side (13 GB together; the
+  sequential run peaks at about 9 GB) and are the models of weeks 3 and 4, so a bug in a student's own network cannot
+  spoil a later week.
+- One "write your own" step per week stays on the core path (the jet mass and a density histogram, a training loop and
+  a PFN, the NT-Xent loss, integrated gradients); the others are stretch questions, with the `itj` reference as the
+  path forward. The leading-log theory, power counting, Sudakov safety, the extra studies and every proposal are
+  stretch questions.
+- The JetClass downloads start at the start of week 3 (`python examples/make_task_data.py --week 4 --only fetch`), a
+  week before they are needed; the weaver install moves to its question (W4.2.7).
+- `examples/make_task_data.py`: `--week 1|2|3|4|all`, one data block per week (`### Data for week 1` to `4`);
+  `block_for(path)` names the block that makes a file, and a missing input names the week's block, as does
+  `examples/train_tagger.py`.
+- After a dry run of week 1 by a reader without a background in jets: the displayed W jet is that of seed 12, which
+  shows a shower step and underlying-event particles at both levels (the jet of seed 3 had no emission); W1.1.3
+  compares the opening angle jet by jet and leaves the closest pair of a top to W1.1.10; W1.3.2 names its measures of
+  width; W3.3.2 classifies $\tau_2$ instead of $\tau_{21}$, whose Sudakov safety stays in W3.3.4; the IRC
+  classification of observables.md sits in a box to open after W3.3.2, and physics.md, methods.md, the glossary and
+  TASKS.md no longer state results that a question asks for; the primer explains the width of an unstable particle
+  (W1.2.2) and gives the toy's ranges of $p_T$ and of underlying-event particles; `boost` of `itj.toy.kinematics` is
+  described with its sign.
+- Times: realistic student hours per question and per week, reading included; measured compute times for the
+  JetClass PN-lite, `attention_stats`, the `kinpid` PFN, the probes of four models, the pretraining of
+  `partsmall_nopair`, the learning curve, the filters, the probes on the real ParT, the label budgets, the inherited
+  invariances and the AUC matrix of the transfer.
+- README.md (a section on the course: the four weeks, their hours and data, the primers, the tiers, how to plan a week
+  of 2-3 days), the docs, the notebooks, the examples, docstrings and help strings cite the new IDs and weeks.
+  install.md gives the data per week, the memory of the week-2 box and where to start JupyterLab; jetclass.md says
+  that JetClass is first needed in week 4; the reading list of references.md is grouped by week, with a reading to
+  start with in each week (two entries added: Salam, *Towards Jetography*; Guest, Cranmer and Whiteson, *Deep Learning
+  and its Application to LHC Physics*).
+- Version 0.2.0 (`itj.__version__`, CITATION.cff).
+
+### Fixed
+
+- Question wording, after the reference solutions of 0.1.1: the mass-sculpting JSD compares the jets that pass and
+  fail the cut, with a random cut of the same size as the floor; the decorrelated tagger is expected to decorrelate in
+  part; the non-invariance of CKA is shown with a whitening; the collinear split for the EFN check acts on the hardest
+  particle; the transfer table gives the top rejection at a signal efficiency of 0.8; weaver 0.5.4 has no seed option;
+  250 W and 250 top jets for the attribution shares; "the largest ln kt among the primary declusterings"; saliency
+  cannot see a flag shortcut; the inherited invariances fold the scaler and the logistic regression into one linear
+  layer; the NT-Xent loss flattens well above its floor; the opening angle of the W is an explicit probe target; the
+  pretraining file is read without its labels; the observable baseline of the probes is linear and contains the
+  soft-drop mass; the EFN filters are rings.
+- Docs: the $\tau_N$ agreement of each axis choice with JetClass is in observables.md (the pointer between
+  jetclass.md, observables.md and TASKS.md was circular); `jet_eta` of JetClass differs from the constituent sum by up
+  to about 0.03, and `jetclass_selection` applies the $p_T$ cut only (data_format.md); the integrated-gradient
+  completeness gaps are realistic, ParticleNet's stops at about 2 % (methods.md); ParT's $m^2$ clamp is reached from
+  $\delta \approx 10^{-3}$ by float32 rounding and its pair features are not clipped (observables.md); imputing all four
+  pair channels at their mean is $U = 0$ (methods.md); `import file mismatch` with a non-editable install
+  (install.md); hadronisation and the detector on the reconstructed Lund density, and the power counting of $D_2$ for
+  two-prong jets (physics.md); `sculpting_jsd` compares pass and fail (methods.md); the glossary's first uses of the
+  underlying event and of anti-kT.
+
+### Removed
+
+- The "Minimum path" list (replaced by the tiers) and the assumption of a PyTorch tutorial before the course.
+
 ## [0.1.1] - 2026-11-13
 
 The course data were made at commit 3433738, which still reported version 0.1.0 but already held the entries of
@@ -124,6 +239,7 @@ Stage A: the toy "A Spray of Hadrons".
   download), and the pytest markers `weaver` and `network`.
 - Documentation and student tasks T0-T7.
 
-[Unreleased]: https://github.com/hqucms/inside-the-jet/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/hqucms/inside-the-jet/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/hqucms/inside-the-jet/releases/tag/v0.2.0
 [0.1.1]: https://github.com/hqucms/inside-the-jet/releases/tag/v0.1.1
 [0.1.0]: https://github.com/hqucms/inside-the-jet/releases/tag/v0.1.0

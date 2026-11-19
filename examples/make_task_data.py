@@ -1,22 +1,24 @@
-"""Make the data sets of TASKS.md ("Data for T1 to T3" and "Data for T4 to T7") on any operating system.
+"""Make the data sets of TASKS.md (the blocks "Data for week 1" to "Data for week 4") on any operating system.
 
-The commands are read from the bash blocks under the two headings "Data for ..." of TASKS.md, so the script and the
-task sheet cannot disagree, and run through the entry point of the command line interface (``itj.toy.cli.main``), so
-they write the same files as the commands typed by hand. Run it from anywhere inside the repository::
+The commands are read from the bash blocks under the four headings "Data for week ..." of TASKS.md, so the script and
+the task sheet cannot disagree, and run through the entry point of the command line interface (``itj.toy.cli.main``),
+so they write the same files as the commands typed by hand. Run it from anywhere inside the repository::
 
     python examples/make_task_data.py --week 1            # the toy files of week 1; files that exist are kept
-    python examples/make_task_data.py --week 2 --only fetch   # start the downloads of week 2 early
-    python examples/make_task_data.py --week 2            # JetClass, pretrained models, split files, more toy files
-    python examples/make_task_data.py --overwrite         # make every file of both weeks again
+    python examples/make_task_data.py --week 4 --only fetch   # start the downloads of week 4 (at the start of week 3)
+    python examples/make_task_data.py --week 4            # JetClass, pretrained models, split files, bonus toy files
+    python examples/make_task_data.py --overwrite         # make every file of the four weeks again
     python examples/make_task_data.py --dry-run           # only print the commands
     python examples/make_task_data.py --only t3_w80       # only the commands whose command line contains "t3_w80"
 
-Week 1 has 18 commands: about 510 000 toy jets and 1.0 GB in ``data/``, about 9 minutes on one core of a 2016 desktop
-CPU, 3 to 4 minutes with 4 workers and under 3 minutes with 8. Week 2 has 8 commands: it downloads 0.4 GB for the
-core tasks (three JetClass validation files and three pretrained models) and 136 MB more for the bonus T7.3, and writes
-about 1.4 GB (the split files for weaver and 210 000 more toy jets, under 2 minutes with 8 workers); it needs
-``data/t2_detector.parquet`` from week 1. ``--skip-fetch`` leaves out the downloads; ``jetgen fetch`` itself keeps
-files with the right size and MD5, so the fetch lines always run.
+Week 1 has 10 commands: about 290 000 toy jets and 0.48 GB in ``data/``, about 5 minutes on one core of a 2016 desktop
+CPU and 1.5 to 2 minutes with 8 workers. Week 2 has 1 command: the training set of 150 000 jets (0.38 GB, about a
+minute with 8 workers). Week 3 has 8 commands: 160 000 jets (0.39 GB, about a minute with 8 workers). Week 4 has 7
+commands: it downloads 0.4 GB for the core questions (three JetClass validation files and three pretrained models) and
+136 MB more for the bonus B.4, and writes about 1.2 GB (the split files for weaver and 120 000 bonus toy jets); it
+needs ``data/t2_detector.parquet`` from week 2. Start its downloads at the start of week 3 with ``--week 4 --only
+fetch``. ``--skip-fetch`` leaves out the downloads; ``jetgen fetch`` itself keeps files with the right size and MD5, so
+the fetch lines always run.
 """
 
 from __future__ import annotations
@@ -31,7 +33,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]  # the repository root: every path of TASKS.md is relative to it
 TASKS = ROOT / "TASKS.md"
-HEADINGS = {"1": "## Data for T1 to T3", "2": "## Data for T4 to T7"}
+WEEKS = ("1", "2", "3", "4")
+HEADINGS = {week: f"### Data for week {week}" for week in WEEKS}
 SPLIT_PARTS = ("train", "val", "test")
 
 
@@ -55,8 +58,8 @@ def task_commands(tasks: Path = TASKS, week: str = "all") -> list[list[str]]:
     ----------
     tasks : pathlib.Path
         The task sheet.
-    week : {"1", "2", "all"}
-        The block of week 1 ("Data for T1 to T3"), of week 2 ("Data for T4 to T7") or both.
+    week : {"1", "2", "3", "4", "all"}
+        The block of one week ("Data for week 1" to "Data for week 4") or all four, in order.
 
     Returns
     -------
@@ -64,7 +67,7 @@ def task_commands(tasks: Path = TASKS, week: str = "all") -> list[list[str]]:
         One list of words per command.
     """
     if week not in (*HEADINGS, "all"):
-        raise ValueError(f"week must be 1, 2 or all, got {week!r}")
+        raise ValueError(f"week must be 1, 2, 3, 4 or all, got {week!r}")
     lines = tasks.read_text(encoding="utf-8").splitlines()
     commands = []
     for key in HEADINGS if week == "all" else (week,):
@@ -94,6 +97,28 @@ def output_of(command: Sequence[str]) -> list[Path]:
     raise ValueError(f"output_of is only defined for generate, merge and split, not {command[0]!r}")
 
 
+def block_for(path: str | Path, tasks: Path = TASKS) -> str | None:
+    """Return the options of this script that make ``path`` (relative to the repository root), or None.
+
+    ``"--week k"`` for a file that a ``generate``, ``merge`` or ``split`` line of week k writes; ``"--week k --only
+    fetch"`` for a JetClass file under ``data/jetclass/<split>/`` that a ``fetch jetclass`` line of week k downloads;
+    None for a file that no data block makes.
+    """
+    name = Path(path).as_posix()
+    blocks = {week: task_commands(tasks, week) for week in WEEKS}
+    for week, commands in blocks.items():
+        for command in commands:
+            if command[0] != "fetch" and name in {p.as_posix() for p in output_of(command)}:
+                return f"--week {week}"
+    for week, commands in blocks.items():
+        for command in commands:
+            if command[:2] == ["fetch", "jetclass"]:
+                split = command[command.index("--split") + 1] if "--split" in command else "val"
+                if name.startswith(f"data/jetclass/{split}/"):
+                    return f"--week {week} --only fetch"
+    return None
+
+
 def _inputs_of(command: Sequence[str]) -> list[Path]:
     """Return the input files of a ``split`` or ``merge`` command."""
     if command[0] not in ("split", "merge"):
@@ -111,8 +136,12 @@ def _inputs_of(command: Sequence[str]) -> list[Path]:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Read the command-line options."""
-    parser = argparse.ArgumentParser(description="Make the data sets of TASKS.md (T1 to T7) on any operating system.")
-    parser.add_argument("--week", choices=("1", "2", "all"), default="all", help="which data block (default: all)")
+    parser = argparse.ArgumentParser(
+        description="Make the data sets of TASKS.md (weeks 1 to 4) on any operating system."
+    )
+    parser.add_argument(
+        "--week", choices=(*WEEKS, "all"), default="all", help="the data block of one week (default: all four)"
+    )
     parser.add_argument("--skip-fetch", action="store_true", help="leave out the downloads (the fetch lines)")
     parser.add_argument("--only", metavar="TEXT", help="only the commands whose command line contains TEXT")
     parser.add_argument("--dry-run", action="store_true", help="only print the commands")
@@ -152,12 +181,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 continue
             missing = [p for p in _inputs_of(command) if not p.exists()]
             if missing:
-                week = "1" if "t2_detector" in missing[0].name else "2 --only fetch"
-                print(
-                    f"{missing[0]} is missing for: {line}\n(make it first: python examples/make_task_data.py --week "
-                    f"{week})",
-                    file=sys.stderr,
-                )
+                block = block_for(missing[0], TASKS)
+                how = f"python examples/make_task_data.py {block}" if block else "see the data blocks of TASKS.md"
+                print(f"{missing[0]} is missing for: {line}\n(make it first: {how})", file=sys.stderr)
                 return 1
             if args.overwrite or any(present):  # a split interrupted half way is made again
                 extra.append("--overwrite")

@@ -636,7 +636,7 @@ def jet_branches(
     tau_axes: Axes = "wta_kt",
     chunk_size: int = 2048,
 ) -> dict[str, np.ndarray]:
-    """Return the ten JetClass jet branches computed from the constituents (the generator and T4.2 use it).
+    """Return the ten JetClass jet branches computed from the constituents (the generator and W4.1.4 use it).
 
     ``jet_pt``, ``jet_eta`` (pseudorapidity), ``jet_phi`` and ``jet_energy`` of the summed four-momentum,
     ``jet_nparticles``, ``jet_sdmass`` (:func:`softdrop`: C/A, beta ``sd_beta``, ``zcut``, ``R0``) and

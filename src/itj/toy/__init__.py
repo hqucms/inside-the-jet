@@ -31,7 +31,7 @@ Exported names (``__all__``, sorted):
 * validation: :func:`check_identities`, :func:`validate`, :class:`ValidationRow`, :func:`format_validation`,
   :func:`sudakov_cdf`, :func:`lund_ll`.
 
-The planted shortcuts of the bonus task T7.2 (:mod:`itj.toy.mystery`: ``mystery_overrides``, ``SHORTCUTS``,
+The planted shortcuts of the bonus question B.3 (:mod:`itj.toy.mystery`: ``mystery_overrides``, ``SHORTCUTS``,
 ``reveal``) are deliberately not re-exported: tab completion on ``itj.toy`` should not hint at them, and reading
 that module spoils the task.
 """

@@ -1,12 +1,18 @@
 # Jet observables and IRC safety
 
-This page defines the jet observables of `itj.observables` and `itj.cluster` exactly, says which conventions reproduce
-the stored JetClass branches, and sorts the observables by infrared and collinear (IRC) safety, with the numerical
-tests that check it on observables (task T1.6) and on trained networks (T5.5). The physics behind the scaling of the
-observables is in [physics.md](physics.md#leading-log-results).
+**New to jets?** Start with [the primer](primer.md), *Jets from zero*: its [section
+12](primer.md#a-first-look-at-the-observables) introduces the observables of this page in words.
 
-All functions take padded arrays: `p4` of shape `(B, N, 4)` with $(p_x, p_y, p_z, E)$ in float64 and a boolean `mask`
-of shape `(B, N)`, as returned by `data.padded_p4()`. Work on chunks of jets:
+An observable is a number computed from the particles of a jet, such as its mass. This page defines the jet
+observables of `itj.observables` and `itj.cluster` exactly. It says which conventions reproduce the stored JetClass
+branches, the jet-level columns of the JetClass data set ([jetclass.md](jetclass.md)). It also sorts the observables
+by infrared and collinear (IRC) safety, that is, by whether a very soft particle or a split into two parallel particles
+can change them. The numerical tests that check this on observables (task `W3.3`) and on trained networks (`W4.3`) are
+at the end. The physics behind the scaling of the observables is in [physics.md](physics.md#leading-log-results).
+
+All functions take padded arrays, in which every jet is filled up with empty slots to a common length. They are
+`p4` of shape `(B, N, 4)` with $(p_x, p_y, p_z, E)$ in float64 and a boolean `mask` of shape `(B, N)`, as returned by
+`data.padded_p4()`. Work on chunks of jets:
 
 ```python
 from itj import observables
@@ -22,28 +28,38 @@ values = observables.compute(data, ["mass", "sdmass", "tau21", "d2", "multiplici
 
 ## Notation
 
-A jet has the constituents $i = 1, \ldots, N$ with the four-momenta $p_i$, transverse momenta $p_{T,i}$, rapidities
-$y_i$ and azimuths $\phi_i$. With $p_{T,J} = \sum_i p_{T,i}$ the momentum fractions are $z_i = p_{T,i}/p_{T,J}$, and
+A jet has the constituents (its particles) $i = 1, \ldots, N$ with the four-momenta $p_i$, transverse momenta
+$p_{T,i}$, rapidities $y_i$ and azimuths $\phi_i$ ([primer](primer.md#collider-coordinates)). With
+$p_{T,J} = \sum_i p_{T,i}$ the momentum fractions are $z_i = p_{T,i}/p_{T,J}$, and
 
 ```math
 \Delta R_{ij} = \sqrt{(y_i - y_j)^2 + \Delta\phi_{ij}^2}, \qquad \Delta\phi_{ij} \in (-\pi, \pi] .
 ```
 
-The observables use the rapidity $y$ (as fastjet); the stored `part_deta` uses the pseudorapidity $\eta$ with the
-JetClass sign ([physics.md](physics.md#units-and-coordinates)).
+The observables use the rapidity $y$, as fastjet (the standard jet-clustering library) does. The stored `part_deta`
+uses the pseudorapidity $\eta$ with the JetClass sign ([physics.md](physics.md#units-and-coordinates)).
 
 ## Mass and multiplicity
+
+The jet mass is the invariant mass of all constituents together. The normalised mass $\rho$ divides its square by
+$(p_T R)^2$, and the multiplicity counts the constituents:
 
 ```math
 m_J^2 = \Bigl(\sum_i p_i\Bigr)^2, \qquad \rho = \frac{m_J^2}{p_{T,J}^2 R^2}, \qquad N = \text{number of constituents}.
 ```
 
-`observables.mass`, `observables.multiplicity`; `jet_p4` gives the summed four-vector and `pt_y_phi_m` the kinematics
-of any four-vector array.
+`observables.mass` and `observables.multiplicity` compute them. `jet_p4` gives the summed four-vector, and
+`pt_y_phi_m` the kinematics of any four-vector array.
 
 ## Soft drop
 
-Soft drop grooms the jet by walking down its Cambridge/Aachen (C/A) tree (1402.2657):
+*In words.* A jet collects soft radiation at wide angles that has little to do with what started it (the underlying
+event, soft gluons). Grooming removes it. Soft drop undoes the clustering from the outside in and throws away soft
+branches. It stops at the first split into two branches that both carry a fair share of the $p_T$: the hard core of the
+jet.
+
+Soft drop grooms the jet by walking down its Cambridge/Aachen (C/A) tree (1402.2657), the clustering history ordered
+by angle ([Clustering](#clustering)):
 
 1. recluster the constituents with C/A ($p = 0$ below), E-scheme, $R = 0.8$;
 2. undo the last merging, $j \to j_1 j_2$;
@@ -52,11 +68,16 @@ Soft drop grooms the jet by walking down its Cambridge/Aachen (C/A) tree (1402.2
 4. otherwise keep the harder branch and go back to 2;
 5. if a single particle is reached, the groomed jet is that particle (mass 0 for a massless particle).
 
-`observables.softdrop(p4, mask, zcut=0.1, beta=0.0, R0=0.8)` returns the groomed mass $m_\mathrm{SD}$, $p_T$,
+`observables.softdrop(p4, mask, zcut=0.1, beta=0.0, R0=0.8)` returns the soft-drop mass $m_\mathrm{SD}$, $p_T$,
 $z_g$ (the momentum fraction of the softer branch at the stop), $R_g$ ($\Delta R_{12}$ at the stop) and the number
 of dropped branches. With $\beta = 0$ it is the modified mass-drop tagger (1307.0007), and it reproduces `jet_sdmass`.
 
 ## N-subjettiness
+
+*In words.* Put $N$ axes into the jet and add up how far each particle is from its nearest axis, weighted by its
+$p_T$. If the jet really has $N$ prongs (hard clusters of energy, one per decay quark), $N$ axes describe it well and
+$\tau_N$ is small. The ratio $\tau_{21} = \tau_2/\tau_1$ is therefore small for a two-prong W jet, and $\tau_{32}$ for a
+three-prong top jet.
 
 N-subjettiness (1011.2268) measures how well the jet is described by $N$ axes $\hat n_1, \ldots, \hat n_N$:
 
@@ -65,8 +86,8 @@ N-subjettiness (1011.2268) measures how well the jet is described by $N$ axes $\
 \qquad \tau_{21} = \frac{\tau_2}{\tau_1}, \quad \tau_{32} = \frac{\tau_3}{\tau_2},
 ```
 
-with $\beta = 1$ and $R_0 = 0.8$. $\tau_N$ is small when the radiation sits close to $N$ axes; a two-prong W jet has a
-small $\tau_{21}$, a three-prong top jet a small $\tau_{32}$. The result depends on the axes
+with $\beta = 1$ and $R_0 = 0.8$. $\tau_N$ is small when the radiation sits close to $N$ axes, so a two-prong W jet has
+a small $\tau_{21}$ and a three-prong top jet a small $\tau_{32}$. The result depends on the axes
 (`observables.subjet_axes`):
 
 | `axes` | definition |
@@ -75,10 +96,15 @@ small $\tau_{21}$, a three-prong top jet a small $\tau_{32}$. The result depends
 | `kt` | exclusive kT clustering with E-scheme recombination (four-vectors add) |
 | `onepass_kt` | the kT axes moved to the nearest local minimum of $\tau_N$ by iterated Weiszfeld updates for $\beta = 1$ (up to 1000 steps, accuracy $10^{-4}$, the defaults of fastjet-contrib), the analogue of fastjet's `OnePass_KT_Axes` |
 
-One exclusive-kT pass gives the axes for every $N$ (the pseudojets alive after $N_\mathrm{particles} - N$ mergings).
-$\tau_N = 0$ when the jet has at most $N$ particles; guard the ratios.
+One exclusive-kT pass gives the axes for every $N$: they are the pseudojets (partial clusters of particles) alive after
+$N_\mathrm{particles} - N$ mergings. $\tau_N = 0$ when the jet has at most $N$ particles, so guard the ratios against
+division by zero.
 
 ## Energy correlation functions
+
+*In words.* Instead of placing axes, sum over every pair and every triple of particles. Weight each by the product of
+their momentum fractions and their angles. $e_2$ measures how spread out the jet is (it is close to its normalised
+mass), and $e_3$ whether there is a third direction. The ratio $D_2$ is small for a two-prong jet.
 
 The energy correlation functions (1305.0007) need no axes:
 
@@ -88,7 +114,7 @@ e_3^{(\beta)} = \sum_{i<j<k} z_i z_j z_k \left(\Delta R_{ij}\Delta R_{ik}\Delta 
 \qquad D_2^{(\beta)} = \frac{e_3^{(\beta)}}{\bigl(e_2^{(\beta)}\bigr)^3}, \qquad C_2^{(\beta)} = \frac{e_3^{(\beta)}}{\bigl(e_2^{(\beta)}\bigr)^2}.
 ```
 
-$D_2$ is from 1409.6298; $\beta = 2$ is mass-like ($e_2^{(2)} \approx m^2/p_T^2$), $\beta = 1$ the default of
+$D_2$ is from 1409.6298. $\beta = 2$ is mass-like ($e_2^{(2)} \approx m^2/p_T^2$), and $\beta = 1$ is the default of
 `observables.d2`. A two-prong jet has $D_2 = O(1)$, a one-prong jet $D_2 \gg 1$
 ([physics.md](physics.md#power-counting)).
 
@@ -101,10 +127,16 @@ e_2 = \tfrac{1}{2}\, z^\mathsf{T} A z, \qquad e_3 = \tfrac{1}{6}\, \mathrm{tr}\b
 since $\mathrm{tr}((ZA)^3) = \sum_{ijk} z_i A_{ij} z_j A_{jk} z_k A_{ki}$ vanishes whenever two indices coincide
 ($A_{ii} = 0$) and counts every triple $i < j < k$ six times. In NumPy this is two batched matrix products:
 `ZA = z[:, :, None] * A`, then `np.trace(ZA @ ZA @ ZA, axis1=1, axis2=2) / 6`. A three-operand `np.einsum` over
-`(B, N, N)` arrays computes the same thing about seven times more slowly, and a whole data set padded to $N = 128$
-takes gigabytes: always loop over chunks of about 2000 jets.
+`(B, N, N)` arrays computes the same thing about seven times more slowly. A whole data set padded to $N = 128$ takes
+gigabytes: always loop over chunks of about 2000 jets.
 
 ## The Lund plane
+
+*In words.* Undo the clustering of the jet step by step, always following the harder branch. At each step, mark the
+softer branch by its angle and by its transverse momentum relative to the harder one. Each emission of the parton
+shower (each branching of a quark or gluon; see [the primer](primer.md#the-parton-shower)) becomes one point in this
+plane. The plane is a map of the radiation of the jet. Soft and collinear emissions fill it evenly, and a
+hard two-body decay stands out as one point at a large $k_t$.
 
 The primary Lund plane (1807.04758) records the history of the hardest branch of the C/A tree. At each declustering
 $j \to a, b$ with $p_{T,a} > p_{T,b}$:
@@ -115,8 +147,9 @@ $j \to a, b$ with $p_{T,a} > p_{T,b}$:
 ```
 
 then follow $a$. `observables.lund_primary(p4, mask)` returns $\ln(1/\Delta)$, $\ln(k_t/\mathrm{GeV})$, $z$ and $\psi$
-per jet (Ragged), `itj.cluster.decluster_primary` the same from any C/A tree, and `observables.lund_density` the density
-per jet per unit area,
+per jet (Ragged, a variable number of entries per jet; see [data_format.md](data_format.md#ragged-columns-and-offsets)).
+`itj.cluster.decluster_primary` returns the same from any C/A tree, and `observables.lund_density` the density per jet
+per unit area,
 
 ```math
 \rho(\Delta, k_t) = \frac{1}{N_\mathrm{jet}}\, \frac{dn}{d\ln(1/\Delta)\, d\ln k_t},
@@ -126,20 +159,21 @@ with its statistical error $\sqrt{n}/(N_\mathrm{jet}\,\text{bin area})$. At lead
 $2\alpha_s C_R/\pi$ ([physics.md](physics.md#lund-density)). The toy stores the same coordinates of the true primary
 emissions as `truth_lund_*`.
 
-**Link to ParT.** The pair features of the Particle Transformer are the Lund coordinates of every pair of particles,
-in the order `[ln kT, ln z, ln Delta, ln m^2]`:
+**Link to ParT.** The Particle Transformer (ParT) uses pair features: numbers computed for every pair of particles
+that steer its attention. They are the Lund coordinates of the pair, in the order `[ln kT, ln z, ln Delta, ln m^2]`:
 
 ```math
 \ln k_T = \ln\bigl(\min(p_{T,i}, p_{T,j})\,\Delta_{ij}\bigr), \quad
 \ln z = \ln\frac{\min(p_{T,i}, p_{T,j})}{p_{T,i} + p_{T,j}}, \quad \ln\Delta_{ij}, \quad \ln m_{ij}^2 = \ln (p_i + p_j)^2,
 ```
 
-with $\Delta_{ij}$ in rapidity and azimuth. Task T5.4 asks which of them the attention bias $U$ uses
+with $\Delta_{ij}$ in rapidity and azimuth. Question `W4.5.7` asks which of them the attention bias $U$ uses
 ([models.md](models.md#particle-transformer)).
 
 ## Angularities and pT_D
 
-The generalised angularities (1408.3122) are
+The generalised angularities (1408.3122) weight each particle by a power of its momentum fraction and a power of its
+distance to the jet axis:
 
 ```math
 \lambda_\beta^\kappa = \sum_i z_i^\kappa \left(\frac{\Delta R_i}{R}\right)^\beta,
@@ -151,50 +185,57 @@ $\lambda_0^0 = N$. `observables.leading_fraction` is $\max_i z_i$.
 
 ## JetClass conventions
 
-These choices reproduce the stored JetClass branches from `part_*` (the toy uses them for its own branches, through
-`itj.observables.jet_branches`):
+These choices reproduce the stored JetClass branches from the per-particle columns `part_*`. The toy uses them for its
+own branches, through `itj.observables.jet_branches`:
 
 | branch | convention | agreement on the JetClass sample |
 |---|---|---|
 | `jet_pt`, `jet_eta`, `jet_phi` | of the four-vector sum of the constituents | exact for `jet_pt` |
 | `jet_energy` | sum of the constituent energies (toy) | JetClass differs by up to 3.8 % |
 | `jet_sdmass` | soft drop, C/A in $(y, \phi)$, E-scheme, $\beta = 0$, $z_\mathrm{cut} = 0.1$, $R_0 = 0.8$ | within 1 % for 85-92 % of the jets |
-| `jet_tau1..4` | $\beta = 1$, $R_0 = 0.8$, $d_0 = \sum p_T R_0$; axes: see below | depends on the axes (task T4.2) |
+| `jet_tau1..4` | $\beta = 1$, $R_0 = 0.8$, $d_0 = \sum p_T R_0$; axes: see below | depends on the axes: with `onepass_kt` 81-94 % of the jets within 1 % ($\tau_1$ best, $\tau_3$ worst), with WTA-kT 30-49 %, with plain kT at most 7 % |
 
-The CMS card of Delphes (master) computes N-subjettiness with `AxisMode 4`, which is fastjet's `OnePass_KT_Axes`,
-$\beta = 1$ and `NormalizedMeasure(1, 0.8)`, and soft drop with $\beta = 0$, $z_\mathrm{cut} = 0.1$, $R_0 = 0.8$;
-whether JetClass used exactly this card is not documented. `itj.observables` offers the three axis choices of the
-table in [N-subjettiness](#n-subjettiness); which of them reproduces the stored `jet_tau*` is task T4.2. The toy
-writes its own `jet_tau1..4` with WTA-kT axes, the fastest of the three (`onepass_kt` costs about 2.6 times more in
-`jet_branches`): toy and JetClass $\tau_N$ therefore differ by an axis offset of about 0.5-1.5 % on top of the
-physics, which matters only when you compare the two to the per cent.
+Delphes is the fast detector simulation behind JetClass. Its CMS card (master) computes N-subjettiness with
+`AxisMode 4`, which is fastjet's `OnePass_KT_Axes`, $\beta = 1$ and `NormalizedMeasure(1, 0.8)`. It computes soft drop
+with $\beta = 0$, $z_\mathrm{cut} = 0.1$, $R_0 = 0.8$. Whether JetClass used exactly this card is not documented.
+`itj.observables` offers the three axis choices of the table in [N-subjettiness](#n-subjettiness). The table above
+gives the agreement of each with the stored `jet_tau*`, measured on 6 000 to 30 000 JetClass test jets; question
+`W4.1.5` measures it and asks why. The toy writes its own `jet_tau1..4` with WTA-kT axes, the fastest of the three
+(`onepass_kt` costs about 2.6 times more in `jet_branches`). Toy and JetClass $\tau_N$ differ by an axis
+offset of about 0.5-1.5 % on top of the physics. This matters only when you compare the two to the per cent.
 
 ## Clustering
 
-`itj.cluster` is a pure-NumPy implementation of the generalised kT algorithms (0802.1189, hep-ph/9707323,
-hep-ph/9907280; the FastJet manual 1111.6097 is the reference), batched over jets, with no fastjet dependency:
+Clustering builds jets by merging particles step by step, closest pair first, under a distance that depends on the
+algorithm ([primer](primer.md#what-a-jet-is)). `itj.cluster` is a pure-NumPy implementation of the generalised kT
+algorithms (0802.1189, hep-ph/9707323, hep-ph/9907280; the FastJet manual 1111.6097 is the reference). It is batched
+over jets and has no fastjet dependency:
 
 ```math
 d_{ij} = \min\bigl(p_{T,i}^{2p}, p_{T,j}^{2p}\bigr)\,\frac{\Delta R_{ij}^2}{R^2}, \qquad d_{iB} = p_{T,i}^{2p},
 \qquad p = \begin{cases} -1 & \text{anti-kT (the jet definition)} \\ 0 & \text{Cambridge/Aachen (soft drop, Lund plane)} \\ 1 & \text{kT (N-subjettiness axes)} \end{cases}.
 ```
 
-- **Inclusive mode** (`inclusive=True`): repeatedly take the smallest of all $d_{ij}$ and $d_{iB}$; merge $i$ and $j$
-  for a $d_{ij}$, call $i$ a jet for a $d_{iB}$. `leading_jet` returns the members of the hardest anti-kT jet.
+- **Inclusive mode** (`inclusive=True`): repeatedly take the smallest of all $d_{ij}$ and $d_{iB}$. For a $d_{ij}$,
+  merge $i$ and $j$; for a $d_{iB}$, call $i$ a jet. `leading_jet` returns the members of the hardest anti-kT jet.
 - **Exclusive mode** (the default of `cluster`): no beam distance; merge until one pseudojet is left. The tree then
-  holds every intermediate state: `exclusive_nodes(n)` gives the $n$ pseudojets alive after
-  $N_\mathrm{particles} - n$ mergings and `exclusive_labels(n)` the subjet of every particle (the reco-level proxy of
-  `truth_part_prong` in task T5.3).
+  holds every intermediate state. `exclusive_nodes(n)` gives the $n$ pseudojets alive after
+  $N_\mathrm{particles} - n$ mergings, and `exclusive_labels(n)` the subjet of every particle (the reco-level proxy of
+  `truth_part_prong` in question `W4.5.1`).
 - **Recombination.** E-scheme: the four-vectors add. WTA (winner-take-all): the $p_T$ add and the merged pseudojet
-  takes the direction of the harder one, so the axis follows the hardest radiation and does not recoil against soft
+  takes the direction of the harder one. The axis then follows the hardest radiation and does not recoil against soft
   emissions.
-- **Algorithm.** For all jets of a bucket at once: keep the $(B, N, N)$ matrix of distances, take the argmin over the
-  flattened matrix, merge, set the row and column of the merged slot to $+\infty$ and recompute the row and column of
-  the new one. Jets are sorted into buckets of similar multiplicity (results in the input order). The cost grows about
-  as $N^{2.8}$: about 0.14 ms per jet and pass at $N \approx 30$ on one 2016 core (i7-6850K). The tests compare the
-  merge sequence with fastjet where it is installed.
+- **Algorithm.** All jets of a bucket are processed at once. The code keeps the $(B, N, N)$ matrix of distances, takes
+  the argmin over the flattened matrix and merges. It then sets the row and column of the merged slot to $+\infty$ and
+  recomputes the row and column of the new one. Jets are sorted into buckets of similar multiplicity (results in the
+  input order). The cost grows about as $N^{2.8}$: about 0.14 ms per jet and pass at $N \approx 30$ on one 2016 core
+  (i7-6850K). The tests compare the merge sequence with fastjet where it is installed.
 
 ## IRC safety
+
+*In words.* Soft and collinear emissions happen in every jet, in numbers that depend on details no calculation
+controls. An observable we can trust must therefore not change when a very soft particle is added, or when one
+particle is split into two that fly in the same direction. Such an observable is infrared and collinear (IRC) safe.
 
 An observable $O(p_1, \ldots, p_n)$ is
 
@@ -204,11 +245,20 @@ An observable $O(p_1, \ldots, p_n)$ is
   $O(\ldots, p_i, \ldots) = O(\ldots, \lambda p_i, (1 - \lambda)p_i, \ldots)$ for every $\lambda \in [0, 1]$, with a
   continuous limit for nearly collinear splittings.
 
-IRC-safe observables have finite perturbative predictions order by order and, in practice, are insensitive to the
-shower cutoff and to hadronisation at leading power. Some observables are not IRC safe but have a finite distribution
-once the all-order (Sudakov) suppression of the region where they are ill defined is included: they are **Sudakov
-safe** (1307.1699, 1502.01719). The ratios $\tau_{21}$ and $D_2$ are the standard examples: $\tau_{21} = \tau_2/\tau_1$
-is $0/0$ when $\tau_1 \to 0$, but jets with $\tau_1 \to 0$ are exponentially rare.
+IRC-safe observables have finite perturbative predictions order by order. In practice they are also insensitive to the
+shower cutoff and to hadronisation at leading power. Some observables are not IRC safe, but the all-order (Sudakov)
+suppression of the region where they are ill defined gives them a finite distribution. They are **Sudakov safe**
+(1307.1699, 1502.01719).
+
+Which observable of the course is which is the subject of `W3.3.2` and `W3.3.4`; which network is safe is the subject
+of `W4.3.2`. Make your own classification first, then open the box.
+
+<details>
+<summary>The classes of the course observables and networks (read after <code>W3.3.2</code>, <code>W3.3.4</code> and
+<code>W4.3.2</code>)</summary>
+
+The ratios $\tau_{21}$ and $D_2$ are the standard examples of Sudakov safety. $\tau_{21} = \tau_2/\tau_1$ is $0/0$ when
+$\tau_1 \to 0$, but jets with $\tau_1 \to 0$ are exponentially rare.
 
 | status | observables |
 |---|---|
@@ -217,7 +267,7 @@ is $0/0$ when $\tau_1 \to 0$, but jets with $\tau_1 \to 0$ are exponentially rar
 | unsafe | the multiplicity $N$ (IR and C); $p_T^D$ and every angularity with $\kappa \ne 1$ (C); the leading fraction (C); counts of particle types and charges (C in principle) |
 
 **A single jet cannot tell safe from Sudakov safe.** A scan that adds a soft particle to one jet with many particles
-tests the continuity of the observable at that jet, where $\tau_1 > 0$: there $\tau_{21}$ changes smoothly, like an
+tests the continuity of the observable at that jet, where $\tau_1 > 0$. There $\tau_{21}$ changes smoothly, like an
 IRC-safe observable. Sudakov safety is a statement about the distribution as $\epsilon \to 0$ over the region
 $\tau_1 \to 0$, which per-jet scans do not reach. A two-particle jet with $\tau_1 \to 0$ shows the difference.
 
@@ -227,17 +277,23 @@ $\tau_1 \to 0$, which per-jet scans do not reach. A two-particle jet with $\tau_
 F\Bigl(\sum_i z_i\, \Phi(y_i, \phi_i)\Bigr),
 ```
 
-with a continuous $\Phi$ is IRC safe by construction: a soft particle enters with the weight $z_i \to 0$, and a
+with a continuous $\Phi$ is IRC safe by construction. A soft particle enters with the weight $z_i \to 0$, and a
 collinear split $\lambda z_i\Phi(y, \phi) + (1 - \lambda) z_i\Phi(y, \phi)$ gives the same sum. A Particle Flow Network
 $F(\sum_i \Phi(z_i, y_i, \phi_i, \ldots))$ is not: every particle adds $\Phi$ at least once, whatever its energy.
-Neither are ParticleNet and ParT, whose pooling, softmax attention and logarithmic inputs give a soft particle an $O(1)$
+Neither are ParticleNet and ParT: their pooling, softmax attention and logarithmic inputs give a soft particle an $O(1)$
 weight.
+
+</details>
 
 ## Numerical IRC tests
 
-`itj.augment` perturbs jets and recomputes every derived quantity (sorting, `part_deta`, `part_dphi`, the jet
-kinematics; with `substructure=True` also `jet_sdmass` and `jet_tau*`), so that the observables and the network inputs
-can simply be computed again:
+*In words.* Test the definition directly. Add a soft particle to every jet, or split a particle in two. Then make the
+perturbation smaller and smaller and watch the observable (or the score of a network). Either it settles back to its
+original value, or it keeps a jump that does not go away.
+
+`itj.augment` perturbs jets and recomputes every derived quantity: sorting, `part_deta`, `part_dphi`, the jet
+kinematics, and with `substructure=True` also `jet_sdmass` and `jet_tau*`. The observables and the network inputs can
+then be computed again:
 
 - **soft** (`add_soft`): add $n \in \{1, 5\}$ particles with $p_T = \epsilon\, p_{T,J}$, $\epsilon = 10^{-1}, \ldots,
   10^{-6}$, uniformly in the disc $\Delta R < R$, as photons or charged hadrons;
@@ -246,38 +302,44 @@ can simply be computed again:
   $\Delta R$ at a random azimuth.
 
 Plot the mean $|\Delta O|/O$ (or, for a network, the mean $|\Delta s|$ of the score) against $\epsilon$ and $\delta$
-on log axes: an IRC-safe quantity falls linearly to zero, an unsafe one stays at a plateau.
+on log axes. An IRC-safe quantity falls linearly to zero; an unsafe one stays at a plateau.
 `itj.interpret.irc_scan` runs the same scans on a tagger. Pitfalls:
 
-- **Truncation.** The networks see at most 128 particles, sorted by $p_T$: added soft particles sort last and are
+- **Truncation.** The networks see at most 128 particles, sorted by $p_T$. Added soft particles sort last and are
   silently dropped from a full jet, which makes any network look IR safe. `max_particles_guard` (used by `irc_scan`)
   refuses jets that would exceed the length.
 - **ParT's pair features.** ParT clamps $k_T$, $\Delta$ and $m^2$ at $10^{-8}$ before the logarithm ($\ln = -18.4$),
-  then normalises them with a BatchNorm: an exactly collinear split ($\delta = 0$) hits the clamp. Use finite
-  $\delta$ and say where the clamp sets in.
+  then normalises them with a BatchNorm (a layer that standardises its inputs). An exactly collinear split
+  ($\delta = 0$) hits the clamp. For massless pieces (TeV photons) the float32 rounding of $E^2 - \lvert\vec p\rvert^2$
+  reaches the $m^2$ clamp well before that, from $\delta \approx 10^{-3}$ on. Use finite $\delta$ and say where the
+  clamp sets in.
+- **ParT's pair features are not clipped.** The particle features are clipped to $[-5, 5]$ after standardisation; the
+  pair features are only clamped before the logarithm. A very soft particle therefore pushes $\ln k_T$ and $\ln z$ of
+  its pairs ever further from the training range. The score of a ParT with $U$ can then change more as $\epsilon$
+  falls.
 - **Particle types.** A split particle copies its charge, flags and impact parameters to both pieces; an added soft
   particle is a photon or a charged hadron (choose and say which).
 - **Standardisation.** Use the same input transformation for every variant (the `FEATURE_SETS` of `itj.features`).
-- **Off-support inputs.** Real jets have no photons below the calorimeter thresholds: the networks never saw such soft
-  particles, so an IR test probes behaviour outside the training data. This is a result in itself.
+- **Off-support inputs.** Real jets have no photons below the calorimeter thresholds, so the networks never saw such
+  soft particles. An IR test probes behaviour outside the training data. This is a result in itself.
 - **The sign of `part_deta`.** A soft particle can move $\eta_\mathrm{jet}$ across 0 and flip the sign of every
   `part_deta`; `keep_sign=True` keeps the sign of the unperturbed jet (`irc_scan` does this).
 - **Zero denominators.** $|\Delta O|/O$ is infinite for a jet with $O = 0$ (about 0.2 % of the detector-level jets
   have $m_\mathrm{SD} = 0$): leave such jets out, or plot the median of $|\Delta O|/O$ as well.
 - **Soft drop below $z_\mathrm{cut}$.** For $\lambda \le z_\mathrm{cut} = 0.1$ the two pieces of a particle fail the
-  soft-drop condition against each other. A jet that soft drop grooms down to one massive hadron then loses the softer
-  piece, and its $m_\mathrm{SD}$ falls by about the fraction $\lambda$ at any $\delta$: a few jets in a thousand give
-  a plateau of the mean. The hadron masses cause it; for massless particles soft drop is collinear safe. Scan
-  $m_\mathrm{SD}$ with $\lambda > z_\mathrm{cut}$ (T1.6 uses 0.5 and 0.2).
-- **Float32 pieces.** The files store float32 four-momenta. Rounded one by one, the pieces $\lambda p$ and
-  $(1 - \lambda)p$ of a TeV particle each get a spurious mass of order 0.1 GeV for $\lambda \ne 0.5$, enough to change
-  the groomed mass of a jet whose soft-drop core is one or two particles. `split_collinear` therefore returns the new
-  four-momenta in float64 (`float64=False` for the float32 behaviour; `irc_scan` and `JetCLRAugment` use float32,
-  since the networks read float32 anyway).
+  soft-drop condition against each other. Take a jet that soft drop grooms down to one massive hadron. That jet loses
+  the softer piece, and its $m_\mathrm{SD}$ falls by about the fraction $\lambda$ at any $\delta$. Such jets, a few in
+  a thousand, give a plateau of the mean. The hadron masses cause it; for massless particles soft drop is collinear
+  safe. Scan $m_\mathrm{SD}$ with $\lambda > z_\mathrm{cut}$ (`W3.3.2` uses 0.5 and 0.2).
+- **Float32 pieces.** The files store float32 four-momenta. When the pieces $\lambda p$ and $(1 - \lambda)p$ of a TeV
+  particle are rounded one by one, each gets a spurious mass of order 0.1 GeV for $\lambda \ne 0.5$. That is enough to
+  change the soft-drop mass of a jet whose soft-drop core is one or two particles. `split_collinear` returns
+  the new four-momenta in float64 (`float64=False` for the float32 behaviour). `irc_scan` and `JetCLRAugment` use
+  float32, since the networks read float32 anyway.
 
 ## Chunking and memory
 
 Functions that build $(B, N, N)$ arrays (`ecf`, `d2`, `c2`, `softdrop`, `nsubjettiness`, `lund_primary`) process at
-most `chunk_size` = 2048 jets at a time (about 0.6 GB at $N = 123$), and `compute` and `jet_branches` loop over
-`data.chunks()`. Do the same in your own code: on an 8 GB laptop a whole data set padded to its longest jet does not
+most `chunk_size` = 2048 jets at a time (about 0.6 GB at $N = 123$). `compute` and `jet_branches` loop over
+`data.chunks()`. Do the same in your own code: on an 8 GB laptop, a whole data set padded to its longest jet does not
 fit.

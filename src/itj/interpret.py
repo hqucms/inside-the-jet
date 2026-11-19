@@ -532,7 +532,7 @@ def irc_scan(
     batch_size: int = 256,
     seed: int = 0,
 ) -> dict[str, np.ndarray]:
-    """Scan how much a tagger responds to soft or collinear perturbations of the jets (T5.5, T6.6).
+    """Scan how much a tagger responds to soft or collinear perturbations of the jets (W4.3).
 
     Every perturbed data set comes from :mod:`itj.augment` with ``keep_sign=True`` (the ``part_deta`` sign of the
     unperturbed jet) and is compared with the unperturbed jets passed through ``itj.augment.recompute``, so that
@@ -654,7 +654,7 @@ def subjet_membership(data: JetData, n: int) -> Ragged:
     """Return the exclusive-kt subjet (0 .. n-1, by subjet pT) of every particle: a reco proxy for the prongs.
 
     The jets are reclustered with the exclusive kt algorithm (E scheme) until ``n`` subjets remain; on toy jets the
-    proxy can be validated against ``truth_part_prong`` before it is used on JetClass (T5.3).
+    proxy can be validated against ``truth_part_prong`` before it is used on JetClass (W4.5.1).
 
     Parameters
     ----------

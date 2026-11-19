@@ -7,13 +7,13 @@ abstract: >-
   coherent parton shower, hadronisation, the underlying event and a simple detector, written with the branches of
   the JetClass data set and a full truth record; tools that run the same analysis on the toy and on JetClass
   (clustering, substructure observables, network inputs identical to weaver, ParticleNet and the Particle
-  Transformer with pretrained JetClass weights, probes, attributions and self-supervised learning) and student
-  tasks on representation learning and interpretability of jet taggers.
+  Transformer with pretrained JetClass weights, probes, attributions and self-supervised learning) and a four-week
+  course for undergraduates, from a primer on jets to representation learning and interpretability of jet taggers.
 authors:
   - name: "<AUTHOR>"
     affiliation: "<AFFILIATION>"
-version: 0.1.1
-date-released: 2026-11-13
+version: 0.2.0
+date-released: 2026-11-19
 license: MIT
 repository-code: "https://github.com/hqucms/inside-the-jet"
 url: "https://github.com/hqucms/inside-the-jet"

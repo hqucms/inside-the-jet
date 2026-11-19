@@ -1,4 +1,4 @@
-"""A multilayer perceptron on jet-level features (``JetBatch.jet``): the baseline of T2.3."""
+"""A multilayer perceptron on jet-level features (``JetBatch.jet``): the baseline of W2.3.3."""
 
 from __future__ import annotations
 

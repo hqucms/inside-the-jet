@@ -197,7 +197,7 @@ def test_predict(jetclass_sample: JetData, dataset: JetDataset) -> None:
 
 
 def test_own_model_gets_clear_errors(jetclass_sample: JetData, tmp_path: Any) -> None:
-    """A student's own nn.Module (T2.4): predict asks for feature_set, save_model and extract say what to do."""
+    """A student's own nn.Module (W2.4.2): predict asks for feature_set, save_model and extract say what to do."""
     from itj.models import save_model
     from itj.probes import extract
 

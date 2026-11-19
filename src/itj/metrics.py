@@ -47,7 +47,7 @@ __all__ = [
     "threshold_at",
 ]
 
-#: The columns of ``results_table.csv`` (one row per trained or evaluated model, T2 to T6); the ``*_err`` columns
+#: The columns of ``results_table.csv`` (one row per trained or evaluated model, weeks 2 to 4); the ``*_err`` columns
 #: hold the bootstrap errors (:func:`bootstrap`) and stay empty when unknown.
 RESULT_COLUMNS: tuple[str, ...] = (
     "model",
@@ -272,7 +272,7 @@ def sculpting_jsd(
 ) -> float:
     """Return the mass sculpting of a cut: the JSD (base 2) between the mass histograms of passing and failing jets.
 
-    Apply it to background jets only (QCD m_SD with a W-tagger cut at eff_s = 50 %, T3.5): 0 means the cut keeps
+    Apply it to background jets only (QCD m_SD with a W-tagger cut at eff_s = 50 %, W3.2.3): 0 means the cut keeps
     the shape of the background mass distribution; 1/JSD is the usual decorrelation figure of merit.
 
     Parameters
@@ -369,7 +369,7 @@ def append_result(path: str | os.PathLike[str], row: Mapping[str, object]) -> No
     writer.writerow({k: fmt(row.get(k)) for k in RESULT_COLUMNS})
     with p.open("a", newline="", encoding="utf-8") as f:
         # decide on the header with the file open and write header and row at once, so that two trainings that
-        # finish together (T2.4 runs two) do not both write a header or interleave their rows
+        # finish together (the week-2 box and a student's own run) do not both write a header or interleave their rows
         f.seek(0, os.SEEK_END)
         header = ""
         if f.tell() == 0:

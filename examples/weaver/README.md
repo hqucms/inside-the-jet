@@ -1,9 +1,12 @@
 # weaver on the toy and on JetClass
 
 [weaver](https://github.com/hqucms/weaver-core) is the training framework of the Particle Transformer (ParT) and of the
-JetClass paper. This page has the commands of task T4.6: a short CPU run on the toy and on JetClass, a prediction
-with the pretrained `ParT_kin` that `itj` must reproduce, and the optional GPU trainings. weaver in one page (the
-configuration files and the options) is in [docs/jetclass.md](../../docs/jetclass.md#weaver-in-one-page).
+JetClass paper. JetClass is the public data set of simulated jets behind ParT, and the toy is the jet generator of
+this repository. This page has the commands of questions `W4.2.7` and `W4.2.8`. They are a short CPU run on the toy and
+on JetClass, then a prediction with the pretrained `ParT_kin` that `itj` must reproduce. The optional GPU trainings
+come last.
+weaver in one page (the configuration files and the options) is in
+[docs/jetclass.md](../../docs/jetclass.md#weaver-in-one-page).
 
 The network configurations in [networks/](networks) are the example wrappers of the ParT repository
 ([jet-universe/particle_transformer](https://github.com/jet-universe/particle_transformer), commit `fa63c86`, MIT
@@ -20,24 +23,25 @@ licence, see [NOTICE.md](../../NOTICE.md)): `example_ParticleTransformer.py`, `e
 
 1. Install the extra (Python 3.10 to 3.13; torch first, see [docs/install.md](../../docs/install.md#optional-weaver)):
    `python -m pip install -e ".[weaver]"`, then check with `python -c "import weaver"`.
-2. Make the data of week 2: `python examples/make_task_data.py --week 2`. The commands below need the split files
+2. Make the data of week 4: `python examples/make_task_data.py --week 4`. The commands below need the split files
    `data/t2_split/` and `data/jetclass/split/` (`jetgen split`) and the checkpoint `models/pretrained/ParT_kin.pt`.
 3. Run every command from the repository root. They are single lines; the Command Prompt versions (Windows) use no
    single quotes and `--gpus ""`.
 
 **Always use the split files.** weaver reads all files of a fetch, concatenates them and only then applies a
-`selection`, so an index-based selection in the YAML would mix the files and train on the test jets of every file but
-the first. `jetgen split` writes the `itj` split (test = the first 20 % of each file, val = the next 10 %, train = the
-rest) as files, and each file becomes its own named group (`name:path`). Then the jets that weaver tests on are
+`selection`. An index-based selection in the YAML would therefore mix the files and train on the test jets of every
+file but the first. `jetgen split` writes the `itj` split as files: test = the first 20 % of each file, val = the next
+10 %, train = the rest. Each file becomes its own named group (`name:path`). Then the jets that weaver tests on are
 exactly those of `itj.io.load(path, part="test")`.
 
 ## A short CPU run on the toy
 
-A ParT of the size of `itj`'s `partsmall` (3 particle-attention blocks, 1 class-attention block, embedding
-(64, 256, 64), pair embedding (32, 32, 32), 4 heads) trained for 30 steps of 256 jets at a constant learning rate
-(`--lr-scheduler none`: with `--num-epochs 1` weaver's default `flat+decay` would run the whole epoch at 1 % of
-`--start-lr` and learn nothing), then tested on the 30 000 test jets. About 1 minute on an otherwise idle 2016 six-core
-CPU: 30 s for the 30 steps, 25 s for the test; it needs about 6 GB of memory (`--in-memory`).
+This run trains a ParT of the size of `itj`'s `partsmall` (3 particle-attention blocks, 1 class-attention block,
+embedding (64, 256, 64), pair embedding (32, 32, 32), 4 heads). It trains for 30 steps of 256 jets at a constant
+learning rate (the size of each update of the weights), then tests on the 30 000 test jets. The constant rate needs
+`--lr-scheduler none`: with `--num-epochs 1` weaver's default `flat+decay` would run the whole epoch at 1 % of
+`--start-lr` and learn nothing. The run takes about 1 minute on an otherwise idle 2016 six-core CPU: 30 s for the 30
+steps, 25 s for the test. It needs about 6 GB of memory (`--in-memory`).
 
 ```bash
 weaver --data-train 't2:data/t2_split/train/t2_detector.parquet' --data-val data/t2_split/val/t2_detector.parquet --data-test 't2:data/t2_split/test/t2_detector.parquet' --data-config src/itj/configs/jets3_kin.yaml --network-config examples/weaver/networks/example_ParticleTransformer.py -o num_layers 3 -o num_cls_layers 1 -o embed_dims "[64,256,64]" -o pair_embed_dims "[32,32,32]" -o num_heads 4 --model-prefix runs/weaver_partsmall/net --gpus '' --num-workers 0 --batch-size 256 --start-lr 1e-3 --num-epochs 1 --steps-per-epoch 30 --lr-scheduler none --in-memory --fetch-step 1 --predict-output pred.parquet
@@ -55,8 +59,8 @@ What it writes:
 | `runs/weaver_partsmall/predict_output/pred_t2.parquet` | `scores` (softmax, $N \times 3$), `_label_` and the observers `jet_pt` ... `jet_tau4`, one row per test jet in file order |
 | `src/itj/configs/jets3_kin.<hash>.auto.yaml` | the data configuration as weaver completed it (ignored by git) |
 
-After 30 steps the tagger is far from trained (test accuracy about 0.6-0.7; chance is 1/3): the run checks the chain,
-not the physics. Load the checkpoint into `itj` and compare the scores:
+After 30 steps the tagger is far from trained (test accuracy about 0.6-0.7; chance is 1/3). The run checks the chain,
+not the physics. Load the checkpoint (the saved weights) into `itj` and compare the scores:
 
 ```python
 import numpy as np
@@ -93,8 +97,8 @@ The predictions go to `runs/weaver_partsmall_jc/predict_output/pred_QCD.parquet`
 
 ## The pretrained ParT_kin
 
-The model of the JetClass paper with the kinematic inputs, ten classes, on the first 5 % of each split test file
-(1 000 jets per class); about 20 s on a CPU, start-up included.
+This runs the model of the JetClass paper with the kinematic inputs (ten classes) on the first 5 % of each split test
+file (1 000 jets per class). It takes about 20 s on a CPU, start-up included.
 
 ```bash
 weaver --predict --network-config examples/weaver/networks/example_ParticleTransformer.py --model-prefix models/pretrained/ParT_kin.pt --data-config src/itj/configs/JetClass_kin.yaml --data-test 'QCD:data/jetclass/split/test/ZJetsToNuNu_120.parquet' 'Wqq:data/jetclass/split/test/WToQQ_120.parquet' 'Tbqq:data/jetclass/split/test/TTBar_120.parquet' --data-fraction 0.05 --fetch-step 1 --gpus '' --num-workers 0 --batch-size 256 --predict-output pred_ParT_kin.parquet
@@ -105,7 +109,7 @@ weaver --predict --network-config examples/weaver/networks/example_ParticleTrans
 ```
 
 A bare `--predict-output` name goes to `predict_output/` next to the model: `models/pretrained/predict_output/
-pred_ParT_kin_QCD.parquet`, `_Wqq` and `_Tbqq`, each with `scores` ($N \times 10$, in the JetClass class order QCD 0,
+pred_ParT_kin_QCD.parquet`, `_Wqq` and `_Tbqq`. Each holds `scores` ($N \times 10$, in the JetClass class order QCD 0,
 ..., Wqq 7, Tbqq 8), `_label_` and the observers. In test mode weaver reads the first `--data-fraction` of every file
 in order, so the same jets are `load(path, max_jets=1000)` of each split test file:
 
@@ -125,15 +129,15 @@ for name, stem in (("QCD", "ZJetsToNuNu_120"), ("Wqq", "WToQQ_120"), ("Tbqq", "T
     print(name, "max |delta s| =", np.abs(predict(model, jets) - s_weaver).max())
 ```
 
-The differences should be at the level of float32 rounding; anything larger means that the inputs differ (a feature
+The differences should be at the level of float32 rounding. Anything larger means that the inputs differ (a feature
 set, the padding or the order of the jets). `weaver` also prints the confusion matrix and the accuracy of every test
-group; with three of the ten classes, the accuracy is that of the argmax over ten outputs (task T4.3 explains why it is
-lower than the three-class accuracy).
+group. With three of the ten classes, the accuracy is that of the argmax over ten outputs (question `W4.2.2` asks why it
+is lower than the three-class accuracy).
 
 ## GPU (optional): full trainings on the three-class subset
 
 On a GPU (a cluster job, see [examples/cluster](../cluster/README.md#a-gpu-training-with-weaver), or Colab), train the
-full ParT (2.1 M parameters) or ParticleNet on QCD, W and top. With the training files of JetClass
+full ParT (2.1 M parameters) or ParticleNet (a graph network) on QCD, W and top. With the training files of JetClass
 (`jetgen fetch jetclass --split train`, 100 000 jets per class, 374 MB) and the split validation files:
 
 ```bash
@@ -141,21 +145,21 @@ weaver --data-train 'QCD:data/jetclass/train/ZJetsToNuNu_000.parquet' 'Wqq:data/
 ```
 
 `--in-memory` needs `--steps-per-epoch` (weaver stops at once without it): 300 000 training jets / 512 = 585 steps per
-epoch, and `--steps-per-epoch-val 58` validates on the 30 000 validation jets once per epoch (without it weaver would
-take 146 steps, the training steps scaled by its default train/validation split, and cycle the validation jets).
-For ParticleNet replace the network configuration by `examples/weaver/networks/example_ParticleNet.py` and the model
-prefix by `runs/weaver_pn/net`; `jets3_kinpid.yaml` and `jets3_full.yaml` add the particle types and the impact
-parameters. `--use-amp` (mixed precision, as in the ParT repository) is needed for a batch of 512 on an 11 GB GPU:
-without it the full ParT runs out of memory on a GTX 1080 Ti. With 300 000 training jets an epoch of ParT then takes
-about 6-7 minutes on a GTX 1080 Ti (850 jets/s); newer GPUs with tensor cores are several times faster.
-`load_model("runs/weaver_part/net_best_epoch_state.pt", name="part")` loads the result into `itj` (pass `feature_set`
-when the inputs are not `kin`).
+epoch. `--steps-per-epoch-val 58` validates on the 30 000 validation jets once per epoch. Without it weaver would take
+146 steps (the training steps scaled by its default train/validation split) and cycle the validation jets. For
+ParticleNet replace the network configuration by `examples/weaver/networks/example_ParticleNet.py` and the model prefix
+by `runs/weaver_pn/net`; `jets3_kinpid.yaml` and `jets3_full.yaml` add the particle types and the impact parameters.
+`--use-amp` (mixed precision: part of the arithmetic in half-precision numbers, as in the ParT repository) is needed for
+a batch of 512 on an 11 GB GPU. Without it the full ParT runs out of memory on a GTX 1080 Ti. With 300 000 training jets
+an epoch of ParT then takes about 6-7 minutes on a GTX 1080 Ti (850 jets/s); newer GPUs with tensor cores are several
+times faster. `load_model("runs/weaver_part/net_best_epoch_state.pt", name="part")` loads the result into `itj` (pass
+`feature_set` when the inputs are not `kin`).
 
-**Colab.** On a GPU runtime, one cell installs everything, fetches and splits the JetClass files of week 2 and
+**Colab.** On a GPU runtime, one cell installs everything, fetches and splits the JetClass files of week 4 and
 fetches the training files:
 
 ```bash
-!git clone https://github.com/hqucms/inside-the-jet.git && cd inside-the-jet && pip install -q -e ".[analysis,weaver]" && python examples/make_task_data.py --week 2 --only jetclass && jetgen fetch jetclass --split train
+!git clone https://github.com/hqucms/inside-the-jet.git && cd inside-the-jet && pip install -q -e ".[analysis,weaver]" && python examples/make_task_data.py --week 4 --only jetclass && jetgen fetch jetclass --split train
 ```
 
 then `%cd inside-the-jet` and run the commands above with `--gpus 0`.
@@ -173,13 +177,13 @@ then `%cd inside-the-jet` and run the commands above with `--gpus 0`.
 
 - **"CUDA" or "no GPU" errors:** pass `--gpus ''` (bash) or `--gpus ""` (Command Prompt); the default `'0'` asks for a
   GPU.
-- **`--num-workers`** must not exceed the number of files in a named group; `0` loads in the main process and is not
-  slower on a CPU (and avoids problems with the spawned workers on Windows and macOS).
+- **`--num-workers`** must not exceed the number of files in a named group. `0` loads in the main process and is not
+  slower on a CPU; it also avoids problems with the spawned workers on Windows and macOS.
 - **Apple Silicon:** weaver selects MPS by itself when it is asked for the CPU; set
   `PYTORCH_ENABLE_MPS_FALLBACK=1` (or `export PYTORCH_ENABLE_MPS_FALLBACK=1` once per terminal).
-- **Python 3.14 or an Intel Mac:** the extra does not install; do T4.6(a) with `itj` alone and say so.
+- **Python 3.14 or an Intel Mac:** the extra does not install; do `W4.2.7` with `itj` alone and say so.
 - **"could not broadcast input array from shape ...":** weaver 0.5.4 fails when it reads only part of a Parquet
-  file, which the default `--fetch-step 0.01` does; every command here therefore has `--fetch-step 1` (each file is
+  file, which the default `--fetch-step 0.01` does. Every command here therefore has `--fetch-step 1` (each file is
   read in one piece).
 - **Lists in `-o`:** the values are read as Python literals, so quote lists: `-o embed_dims "[64,256,64]"`.
 - **A short run stays at chance** (accuracy about 1/3, `lr=1.00e-05` in the progress bar): the command lacks

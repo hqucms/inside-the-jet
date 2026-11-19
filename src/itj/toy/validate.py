@@ -3,7 +3,8 @@
 * :func:`check_identities` checks the exact identities of generated data (``docs/data_format.md#exact-identities``);
   the tests assert that every entry is True on every preset and the notebook prints it. Augmented jets
   (:mod:`itj.augment`) are exempt.
-* :func:`sudakov_cdf`, :func:`lund_ll` and :func:`mass_peak_ll` are the analytic references of T1.2-T1.4.
+* :func:`sudakov_cdf`, :func:`lund_ll` and :func:`mass_peak_ll` are the analytic references of W1.2.10, W1.2.4 and
+  W1.3.5.
 * :func:`validate` generates the validation samples and returns the rows of the table of ``docs/physics.md``
   (:func:`format_validation` prints it). Every two-sided row has a calibrated value (the mean of five seeds with
   ``n = 10 000``, measured when the toy was calibrated against the JetClass validation files) and passes if its

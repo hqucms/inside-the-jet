@@ -1,9 +1,10 @@
 # Literature values, the toy defaults and the reading list
 
-Part 1 lists the physical constants and detector parameters behind the defaults of the toy: every number is taken
-from the cited source or derived from it with the stated formula ("derived"). The toy is a cartoon, not a tune: the
-"toy default" column lists the values of the `detector` preset, and the "comment" column says how they relate to the
-literature. Part 2 is the reading list of the course, grouped by task, with the papers to read first in each week.
+Part 1 lists the physical constants and detector parameters behind the defaults of the toy, the course's own jet
+simulator ([primer.md](primer.md#the-toy-and-its-files)). Every number is taken from the cited source or derived from it
+with the stated formula ("derived"). The toy is a cartoon, not a tune (a set of parameters fitted to data). The "toy
+default" column lists the values of the `detector` preset, and the "comment" column says how they relate to the
+literature. Part 2 is the reading list of the course, grouped by week, with the papers to start with in each week.
 
 ## 1. Hard process
 
@@ -58,7 +59,7 @@ literature. Part 2 is the reading list of the course, grouped by task, with the 
 ## 5. JetClass measured values
 
 Measured with `itj` on 20 000 jets of each validation file of JetClass [3] (QCD = `ZJetsToNuNu_120`, W =
-`WToQQ_120`, top = `TTBar_120`); the toy is calibrated to them at the `detector` level
+`WToQQ_120`, top = `TTBar_120`). The toy is calibrated to these values at the `detector` level
 ([physics.md](physics.md#calibration-and-validation)). The statistics of the whole files (100 000 jets, all ten
 classes) are in [jetclass.md](jetclass.md#the-data-set); they differ in the last digit.
 
@@ -105,141 +106,162 @@ classes) are in [jetclass.md](jetclass.md#the-data-set); they differ in the last
 ## Reading list
 
 Every entry gives the authors, the title, the journal (or "preprint") and the arXiv number
-(`https://arxiv.org/abs/<number>`); the arXiv numbers were checked against the arXiv API on 2026-11-05. The "used in"
-column names the tasks (and documentation pages) where a paper is needed.
+(`https://arxiv.org/abs/<number>`). The arXiv numbers were checked against the arXiv API on 2026-11-05. The two entries
+added in 0.2.0, Salam and Guest, Cranmer and Whiteson, were added from their journal versions. The list is grouped by
+the week of the course in which a paper is first needed. The "used in" column names the questions (IDs of
+[TASKS.md](../TASKS.md)), tasks or weeks and the documentation pages where the paper is needed.
 
-**Read first.** Week 1: Marzani, Soyez and Spannowsky, *Looking inside jets* (arXiv:1901.10342, chapters 1-3);
-Dreyer, Salam and Soyez, *The Lund Jet Plane* (arXiv:1807.04758); Komiske, Metodiev and Thaler, *Energy Flow
-Networks* (arXiv:1810.05165); Alain and Bengio, *Understanding intermediate layers using linear classifier probes*
-(arXiv:1610.01644). Week 2: Qu, Li and Qian, *Particle Transformer for Jet Tagging* (arXiv:2202.03772); Sundararajan,
-Taly and Yan, *Axiomatic Attribution for Deep Networks* (arXiv:1703.01365); Jain and Wallace, *Attention is not
-Explanation* (arXiv:1902.10186); Dillon et al., *Symmetries, Safety, and Self-Supervision* (arXiv:2108.04253).
+**Start here.** Each week opens with one or two readings to start with, listed first in its table:
 
-### Jet physics, observables and generators (T1)
+- week 1: Salam, *Towards Jetography* (arXiv:0906.1833), chapters 1-2;
+- week 2: Guest, Cranmer and Whiteson, *Deep Learning and its Application to LHC Physics* (arXiv:1806.11484);
+- week 3: Alain and Bengio, *Understanding intermediate layers using linear classifier probes* (arXiv:1610.01644);
+- week 4: Sundararajan, Taly and Yan, *Axiomatic Attribution for Deep Networks* (arXiv:1703.01365), with Jain and
+  Wallace, *Attention is not Explanation* (arXiv:1902.10186).
+
+None of them is needed to answer a question: the primers and the docs of this repository are enough.
+
+### Week 1: jets, observables and generators
+
+**Start here:** Salam, *Towards Jetography*, chapters 1-2, then Marzani, Soyez and Spannowsky, *Looking inside jets*,
+chapters 1-3, and section 2 of the review by Larkoski, Moult and Nachman. The last section of the primer
+([primer.md](primer.md#where-to-read-more)) lists them next to the docs of this repository.
 
 | reference | used in |
 |---|---|
-| S. Marzani, G. Soyez and M. Spannowsky, *Looking inside jets: an introduction to jet substructure and boosted-object phenomenology*, Lecture Notes in Physics, Springer (2019), arXiv:1901.10342 | T1 (ch. 1-3 read first; Lund plane, mass, soft drop), T4.2 |
-| A. J. Larkoski, I. Moult and B. Nachman, *Jet Substructure at the Large Hadron Collider: A Review of Recent Advances in Theory and Machine Learning*, Phys. Rept. 841, 1 (2020), arXiv:1709.04464 | T1, T2 |
-| R. Kogler et al., *Jet Substructure at the Large Hadron Collider: Experimental Review*, Rev. Mod. Phys. 91, 045003 (2019), arXiv:1803.06991 | T1, T4 |
-| M. Cacciari, G. P. Salam and G. Soyez, *The anti-kt jet clustering algorithm*, JHEP 04 (2008) 063, arXiv:0802.1189 | T1.3, observables.md#clustering |
+| G. P. Salam, *Towards Jetography*, Eur. Phys. J. C 67, 637 (2010), arXiv:0906.1833 | week 1 (start here: chapters 1-2) |
+| S. Marzani, G. Soyez and M. Spannowsky, *Looking inside jets: an introduction to jet substructure and boosted-object phenomenology*, Lecture Notes in Physics, Springer (2019), arXiv:1901.10342 | week 1 (start here: chapters 1-3; Lund plane, mass, soft drop), `W4.1.5` |
+| A. J. Larkoski, I. Moult and B. Nachman, *Jet Substructure at the Large Hadron Collider: A Review of Recent Advances in Theory and Machine Learning*, Phys. Rept. 841, 1 (2020), arXiv:1709.04464 | week 1 (start here: section 2), week 2 |
+| R. Kogler et al., *Jet Substructure at the Large Hadron Collider: Experimental Review*, Rev. Mod. Phys. 91, 045003 (2019), arXiv:1803.06991 | week 1, week 4 |
+| M. Cacciari, G. P. Salam and G. Soyez, *The anti-kt jet clustering algorithm*, JHEP 04 (2008) 063, arXiv:0802.1189 | `W1.1.3`, observables.md#clustering |
 | M. Cacciari, G. P. Salam and G. Soyez, *FastJet user manual*, Eur. Phys. J. C 72, 1896 (2012), arXiv:1111.6097 | observables.md#clustering |
-| Yu. L. Dokshitzer, G. D. Leder, S. Moretti and B. R. Webber, *Better Jet Clustering Algorithms*, JHEP 08 (1997) 001, arXiv:hep-ph/9707323 | T1.3 (C/A) |
-| M. Wobisch and T. Wengler, *Hadronization Corrections to Jet Cross Sections in Deep-Inelastic Scattering*, workshop on Monte Carlo generators for HERA physics (1999), arXiv:hep-ph/9907280 | T1.3 (C/A) |
-| J. Thaler and K. Van Tilburg, *Identifying Boosted Objects with N-subjettiness*, JHEP 03 (2011) 015, arXiv:1011.2268 | T1.5, T2.1 |
-| J. Thaler and K. Van Tilburg, *Maximizing Boosted Top Identification by Minimizing N-subjettiness*, JHEP 02 (2012) 093, arXiv:1108.2701 | T1.5, T4.2 (minimised axes) |
-| A. J. Larkoski, D. Neill and J. Thaler, *Jet Shapes with the Broadening Axis*, JHEP 04 (2014) 017, arXiv:1401.2158 | T1.5 (WTA axes) |
-| A. J. Larkoski, G. P. Salam and J. Thaler, *Energy Correlation Functions for Jet Substructure*, JHEP 06 (2013) 108, arXiv:1305.0007 | T1.5 (ECFs, C2) |
-| A. J. Larkoski, I. Moult and D. Neill, *Power Counting to Better Jet Observables*, JHEP 12 (2014) 009, arXiv:1409.6298 | T1.5 (D2, power counting) |
-| A. J. Larkoski, I. Moult and D. Neill, *Analytic Boosted Boson Discrimination*, preprint (2015), arXiv:1507.03018 | T1.5 |
-| I. Moult, L. Necib and J. Thaler, *New Angles on Energy Correlation Functions*, JHEP 12 (2016) 153, arXiv:1609.07483 | T1.7 |
-| A. J. Larkoski, S. Marzani, G. Soyez and J. Thaler, *Soft Drop*, JHEP 05 (2014) 146, arXiv:1402.2657 | T1.4, T2.1 |
-| M. Dasgupta, A. Fregoso, S. Marzani and G. P. Salam, *Towards an understanding of jet substructure*, JHEP 09 (2013) 029, arXiv:1307.0007 | T1.4 (mMDT, mass at leading log) |
-| F. A. Dreyer, G. P. Salam and G. Soyez, *The Lund Jet Plane*, JHEP 12 (2018) 064, arXiv:1807.04758 | T1.3 (read first), T5.4 |
-| ATLAS Collaboration, *Measurement of the Lund jet plane using charged particles in 13 TeV proton-proton collisions with the ATLAS detector*, Phys. Rev. Lett. 124, 222002 (2020), arXiv:2004.03540 | T1.3 |
-| P. T. Komiske, E. M. Metodiev and J. Thaler, *Energy flow polynomials: A complete linear basis for jet substructure*, JHEP 04 (2018) 013, arXiv:1712.07124 | T1.6, observables.md#irc-safety |
-| P. T. Komiske, E. M. Metodiev and J. Thaler, *The Metric Space of Collider Events*, Phys. Rev. Lett. 123, 041801 (2019), arXiv:1902.02346 | T7 |
-| A. J. Larkoski and J. Thaler, *Unsafe but Calculable: Ratios of Angularities in Perturbative QCD*, JHEP 09 (2013) 137, arXiv:1307.1699 | T1.6 (Sudakov safety) |
-| A. J. Larkoski, S. Marzani and J. Thaler, *Sudakov Safety in Perturbative QCD*, Phys. Rev. D 91, 111501 (2015), arXiv:1502.01719 | T1.6 (Sudakov safety) |
-| M. Dasgupta, L. Magnea and G. P. Salam, *Non-perturbative QCD effects in jets at hadron colliders*, JHEP 02 (2008) 055, arXiv:0712.3014 | T1.4 (hadronisation and UE shifts of the mass) |
-| A. J. Larkoski, J. Thaler and W. J. Waalewijn, *Gaining (Mutual) Information about Quark/Gluon Discrimination*, JHEP 11 (2014) 129, arXiv:1408.3122 | T1.7, T2.7 (angularities, q/g) |
-| P. Gras et al., *Systematics of quark/gluon tagging*, JHEP 07 (2017) 091, arXiv:1704.03878 | T1.1, T2.7 |
-| ATLAS Collaboration, *Measurement of the charged-particle multiplicity inside jets from √s = 8 TeV pp collisions with the ATLAS detector*, Eur. Phys. J. C 76, 322 (2016), arXiv:1602.00988 | T1.1 (multiplicity) |
-| I. M. Dremin and J. W. Gary, *Hadron Multiplicities*, Phys. Rept. 349, 301 (2001), arXiv:hep-ph/0004215 | T1.1 (C_A/C_F and the measured ratio) |
-| S. Höche, *Introduction to parton-shower event generators*, preprint (2014), arXiv:1411.4085 | T1 (parton showers) |
-| A. Buckley et al., *General-purpose event generators for LHC physics*, Phys. Rept. 504, 145 (2011), arXiv:1101.2599 | T1 (generators) |
+| Yu. L. Dokshitzer, G. D. Leder, S. Moretti and B. R. Webber, *Better Jet Clustering Algorithms*, JHEP 08 (1997) 001, arXiv:hep-ph/9707323 | `W1.2.7` (C/A) |
+| M. Wobisch and T. Wengler, *Hadronization Corrections to Jet Cross Sections in Deep-Inelastic Scattering*, workshop on Monte Carlo generators for HERA physics (1999), arXiv:hep-ph/9907280 | `W1.2.7` (C/A) |
+| J. Thaler and K. Van Tilburg, *Identifying Boosted Objects with N-subjettiness*, JHEP 03 (2011) 015, arXiv:1011.2268 | `W1.4`, `W2.1.2` |
+| J. Thaler and K. Van Tilburg, *Maximizing Boosted Top Identification by Minimizing N-subjettiness*, JHEP 02 (2012) 093, arXiv:1108.2701 | `W1.4.4`, `W4.1.5` (minimised axes) |
+| A. J. Larkoski, D. Neill and J. Thaler, *Jet Shapes with the Broadening Axis*, JHEP 04 (2014) 017, arXiv:1401.2158 | `W1.4.4` (WTA axes) |
+| A. J. Larkoski, G. P. Salam and J. Thaler, *Energy Correlation Functions for Jet Substructure*, JHEP 06 (2013) 108, arXiv:1305.0007 | `W1.4.5` (ECFs, C2) |
+| A. J. Larkoski, I. Moult and D. Neill, *Power Counting to Better Jet Observables*, JHEP 12 (2014) 009, arXiv:1409.6298 | `W1.4.6` (D2, power counting) |
+| A. J. Larkoski, I. Moult and D. Neill, *Analytic Boosted Boson Discrimination*, preprint (2015), arXiv:1507.03018 | `W1.4` |
+| I. Moult, L. Necib and J. Thaler, *New Angles on Energy Correlation Functions*, JHEP 12 (2016) 153, arXiv:1609.07483 | `W1.4.7` |
+| A. J. Larkoski, S. Marzani, G. Soyez and J. Thaler, *Soft Drop*, JHEP 05 (2014) 146, arXiv:1402.2657 | `W1.3.2`, `W2.1.2` |
+| M. Dasgupta, A. Fregoso, S. Marzani and G. P. Salam, *Towards an understanding of jet substructure*, JHEP 09 (2013) 029, arXiv:1307.0007 | `W1.3.5` (mMDT, mass at leading log) |
+| F. A. Dreyer, G. P. Salam and G. Soyez, *The Lund Jet Plane*, JHEP 12 (2018) 064, arXiv:1807.04758 | `W1.2.3`-`W1.2.8`, `W4.5.7` |
+| ATLAS Collaboration, *Measurement of the Lund jet plane using charged particles in 13 TeV proton-proton collisions with the ATLAS detector*, Phys. Rev. Lett. 124, 222002 (2020), arXiv:2004.03540 | `W1.2.7` |
+| M. Dasgupta, L. Magnea and G. P. Salam, *Non-perturbative QCD effects in jets at hadron colliders*, JHEP 02 (2008) 055, arXiv:0712.3014 | `W1.3.3`, `W1.3.6` (hadronisation and UE shifts of the mass) |
+| A. J. Larkoski, J. Thaler and W. J. Waalewijn, *Gaining (Mutual) Information about Quark/Gluon Discrimination*, JHEP 11 (2014) 129, arXiv:1408.3122 | `W1.4.7`, `W2.5.6` (angularities, q/g) |
+| P. Gras et al., *Systematics of quark/gluon tagging*, JHEP 07 (2017) 091, arXiv:1704.03878 | `W1.2.5`, `W2.5.6` |
+| ATLAS Collaboration, *Measurement of the charged-particle multiplicity inside jets from √s = 8 TeV pp collisions with the ATLAS detector*, Eur. Phys. J. C 76, 322 (2016), arXiv:1602.00988 | `W1.2.5` (multiplicity) |
+| I. M. Dremin and J. W. Gary, *Hadron Multiplicities*, Phys. Rept. 349, 301 (2001), arXiv:hep-ph/0004215 | `W1.2.5` (C_A/C_F and the measured ratio) |
+| S. Höche, *Introduction to parton-shower event generators*, preprint (2014), arXiv:1411.4085 | week 1 (parton showers) |
+| A. Buckley et al., *General-purpose event generators for LHC physics*, Phys. Rept. 504, 145 (2011), arXiv:1101.2599 | week 1 (generators) |
 | T. Sjöstrand, S. Mrenna and P. Skands, *A Brief Introduction to PYTHIA 8.1*, Comput. Phys. Commun. 178, 852 (2008), arXiv:0710.3820 | physics.md |
 | T. Sjöstrand et al., *An Introduction to PYTHIA 8.2*, Comput. Phys. Commun. 191, 159 (2015), arXiv:1410.3012 | physics.md |
-| L. Lönnblad, *Fooling Around with the Sudakov Veto Algorithm*, Eur. Phys. J. C 73, 2588 (2013), arXiv:1211.7204 | T1.2 (veto algorithm) |
+| L. Lönnblad, *Fooling Around with the Sudakov Veto Algorithm*, Eur. Phys. J. C 73, 2588 (2013), arXiv:1211.7204 | `W1.2.10` (veto algorithm) |
 | S. Gieseke, P. Stephens and B. Webber, *New formalism for QCD parton showers*, JHEP 12 (2003) 045, arXiv:hep-ph/0310083 | physics.md (angular ordering) |
 | M. Bähr et al., *Herwig++ Physics and Manual*, Eur. Phys. J. C 58, 639 (2008), arXiv:0803.0883 | physics.md (reshuffle) |
-| A. Papaefstathiou, *Pyresias: How to write a parton shower*, preprint (2024), arXiv:2406.03528 | T1 (a pedagogical toy shower) |
-| K. Cranmer, M. Drnevich, S. Macaluso and D. Pappadopulo, *Reframing Jet Physics with New Computational Methods*, preprint (2021), arXiv:2105.10512 | T1 (the Ginkgo toy shower) |
-| J. Brehmer, S. Macaluso, D. Pappadopulo and K. Cranmer, *Hierarchical clustering in particle physics through reinforcement learning*, preprint (2020), arXiv:2011.08191 | T1 |
+| A. Papaefstathiou, *Pyresias: How to write a parton shower*, preprint (2024), arXiv:2406.03528 | week 1 (a pedagogical toy shower) |
+| K. Cranmer, M. Drnevich, S. Macaluso and D. Pappadopulo, *Reframing Jet Physics with New Computational Methods*, preprint (2021), arXiv:2105.10512 | week 1 (the Ginkgo toy shower) |
+| J. Brehmer, S. Macaluso, D. Pappadopulo and K. Cranmer, *Hierarchical clustering in particle physics through reinforcement learning*, preprint (2020), arXiv:2011.08191 | week 1 |
 | ATLAS Collaboration, *Measurement of charged-particle distributions sensitive to the underlying event in √s = 13 TeV proton-proton collisions with the ATLAS detector at the LHC*, JHEP 03 (2017) 157, arXiv:1701.05390 | physics.md#underlying-event |
-| M. Cacciari and G. P. Salam, *Pileup subtraction using jet areas*, Phys. Lett. B 659, 119 (2008), arXiv:0707.1378 | T1.7 (pileup) |
-| D. Bertolini, P. Harris, M. Low and N. Tran, *Pileup Per Particle Identification*, JHEP 10 (2014) 059, arXiv:1407.6013 | T1.7 (pileup) |
-| M. Cacciari, G. P. Salam and G. Soyez, *On the use of charged-track information to subtract neutral pileup*, Phys. Rev. D 92, 014003 (2015), arXiv:1404.7353 | T1.7 (pileup) |
+| M. Cacciari and G. P. Salam, *Pileup subtraction using jet areas*, Phys. Lett. B 659, 119 (2008), arXiv:0707.1378 | `W1.4.7` (pileup) |
+| D. Bertolini, P. Harris, M. Low and N. Tran, *Pileup Per Particle Identification*, JHEP 10 (2014) 059, arXiv:1407.6013 | `W1.4.7` (pileup) |
+| M. Cacciari, G. P. Salam and G. Soyez, *On the use of charged-track information to subtract neutral pileup*, Phys. Rev. D 92, 014003 (2015), arXiv:1404.7353 | `W1.4.7` (pileup) |
 | ATLAS and CMS Collaborations, *Combination of the W boson polarization measurements in top quark decays using ATLAS and CMS data at √s = 8 TeV*, JHEP 08 (2020) 051, arXiv:2005.03799 | physics.md#hard-process |
 
-### Supervised taggers (T2, T4)
+### Week 2: taggers
+
+**Start here:** Guest, Cranmer and Whiteson, *Deep Learning and its Application to LHC Physics*. Then read the Energy
+Flow Networks of Komiske, Metodiev and Thaler before `W2.4`. Read the ParT paper of Qu, Li and Qian before `W2.5`; it is
+the paper of week 4 too.
 
 | reference | used in |
 |---|---|
-| G. Kasieczka et al., *The Machine Learning Landscape of Top Taggers*, SciPost Phys. 7, 014 (2019), arXiv:1902.09914 | T2 |
-| G. Kasieczka, T. Plehn, M. Russell and T. Schell, *Deep-learning Top Taggers or The End of QCD?*, JHEP 05 (2017) 006, arXiv:1701.08784 | T2 |
-| L. de Oliveira et al., *Jet-Images -- Deep Learning Edition*, JHEP 07 (2016) 069, arXiv:1511.05190 | T2 |
-| M. Zaheer et al., *Deep Sets*, NeurIPS 30 (2017), arXiv:1703.06114 | T2.4 |
-| P. T. Komiske, E. M. Metodiev and J. Thaler, *Energy Flow Networks: Deep Sets for Particle Jets*, JHEP 01 (2019) 121, arXiv:1810.05165 | T2.4, T3.3, T5.5 (read first) |
-| H. Qu and L. Gouskos, *ParticleNet: Jet Tagging via Particle Clouds*, Phys. Rev. D 101, 056019 (2020), arXiv:1902.08570 | T2.5, T4.3 |
-| Y. Wang et al., *Dynamic Graph CNN for Learning on Point Clouds*, ACM Trans. Graph. 38, 146 (2019), arXiv:1801.07829 | T2.5 (EdgeConv) |
-| H. Qu, C. Li and S. Qian, *Particle Transformer for Jet Tagging*, ICML 2022, PMLR 162, 18281 (2022), arXiv:2202.03772 | T2.5, T4 (read first) |
-| F. A. Dreyer and H. Qu, *Jet tagging in the Lund plane with graph networks*, JHEP 03 (2021) 052, arXiv:2012.08526 | T2.5, T5.4 |
-| A. Vaswani et al., *Attention Is All You Need*, NeurIPS 30 (2017), arXiv:1706.03762 | T2.5 |
-| H. Touvron et al., *Going deeper with Image Transformers*, ICCV (2021), arXiv:2103.17239 | T2.5 (class attention) |
-| G. Kasieczka, N. Kiefer, T. Plehn and J. M. Thompson, *Quark-Gluon Tagging: Machine Learning vs Detector*, SciPost Phys. 6, 069 (2019), arXiv:1812.09223 | T2.7, T4.5 |
-| A. Butter, G. Kasieczka, T. Plehn and M. Russell, *Deep-learned Top Tagging with a Lorentz Layer*, SciPost Phys. 5, 028 (2018), arXiv:1707.08966 | T2 |
+| D. Guest, K. Cranmer and D. Whiteson, *Deep Learning and its Application to LHC Physics*, Ann. Rev. Nucl. Part. Sci. 68, 161 (2018), arXiv:1806.11484 | week 2 (start here) |
+| G. Kasieczka et al., *The Machine Learning Landscape of Top Taggers*, SciPost Phys. 7, 014 (2019), arXiv:1902.09914 | week 2 |
+| G. Kasieczka, T. Plehn, M. Russell and T. Schell, *Deep-learning Top Taggers or The End of QCD?*, JHEP 05 (2017) 006, arXiv:1701.08784 | week 2 |
+| L. de Oliveira et al., *Jet-Images -- Deep Learning Edition*, JHEP 07 (2016) 069, arXiv:1511.05190 | week 2 |
+| M. Zaheer et al., *Deep Sets*, NeurIPS 30 (2017), arXiv:1703.06114 | `W2.4` |
+| P. T. Komiske, E. M. Metodiev and J. Thaler, *Energy Flow Networks: Deep Sets for Particle Jets*, JHEP 01 (2019) 121, arXiv:1810.05165 | `W2.4`, `W3.2.2`, `W4.3` |
+| H. Qu and L. Gouskos, *ParticleNet: Jet Tagging via Particle Clouds*, Phys. Rev. D 101, 056019 (2020), arXiv:1902.08570 | `W2.5`, `W4.2.2` |
+| Y. Wang et al., *Dynamic Graph CNN for Learning on Point Clouds*, ACM Trans. Graph. 38, 146 (2019), arXiv:1801.07829 | `W2.5.1` (EdgeConv) |
+| H. Qu, C. Li and S. Qian, *Particle Transformer for Jet Tagging*, ICML 2022, PMLR 162, 18281 (2022), arXiv:2202.03772 | `W2.5`, week 4 |
+| F. A. Dreyer and H. Qu, *Jet tagging in the Lund plane with graph networks*, JHEP 03 (2021) 052, arXiv:2012.08526 | `W2.5`, `W4.5.7` |
+| A. Vaswani et al., *Attention Is All You Need*, NeurIPS 30 (2017), arXiv:1706.03762 | `W2.5` |
+| H. Touvron et al., *Going deeper with Image Transformers*, ICCV (2021), arXiv:2103.17239 | `W2.5.1` (class attention) |
+| G. Kasieczka, N. Kiefer, T. Plehn and J. M. Thompson, *Quark-Gluon Tagging: Machine Learning vs Detector*, SciPost Phys. 6, 069 (2019), arXiv:1812.09223 | `W2.5.6`, `W4.2.3` |
+| A. Butter, G. Kasieczka, T. Plehn and M. Russell, *Deep-learned Top Tagging with a Lorentz Layer*, SciPost Phys. 5, 028 (2018), arXiv:1707.08966 | week 2 |
 
-### Representations, probes and decorrelation (T3)
+### Week 3: representations, probes and self-supervision
 
-| reference | used in |
-|---|---|
-| G. Alain and Y. Bengio, *Understanding intermediate layers using linear classifier probes*, preprint (2016), arXiv:1610.01644 | T3.2 (read first) |
-| J. Hewitt and P. Liang, *Designing and Interpreting Probes with Control Tasks*, EMNLP (2019), arXiv:1909.03368 | T3.2 (control tasks) |
-| Y. Belinkov, *Probing Classifiers: Promises, Shortcomings, and Advances*, Comput. Linguist. 48, 207 (2022), arXiv:2102.12452 | T3.2 |
-| S. Kornblith, M. Norouzi, H. Lee and G. Hinton, *Similarity of Neural Network Representations Revisited*, ICML 2019, PMLR 97 (2019), arXiv:1905.00414 | T3.4 |
-| L. McInnes, J. Healy and J. Melville, *UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction*, preprint (2018), arXiv:1802.03426 | T3.1 |
-| T. Faucett, J. Thaler and D. Whiteson, *Mapping Machine-Learned Physics into a Human-Readable Space*, Phys. Rev. D 103, 036020 (2021), arXiv:2010.11998 | T3.2, T3.4 |
-| K. Datta, A. Larkoski and B. Nachman, *Automating the Construction of Jet Observables with Machine Learning*, Phys. Rev. D 100, 095016 (2019), arXiv:1902.07180 | T3 |
-| R. Das, G. Kasieczka and D. Shih, *Feature Selection with Distance Correlation*, preprint (2022), arXiv:2212.00046 | T3 |
-| J. Dolen et al., *Thinking outside the ROCs: Designing Decorrelated Taggers (DDT) for jet substructure*, JHEP 05 (2016) 156, arXiv:1603.00027 | T3.5 |
-| S. Chang, T. Cohen and B. Ostdiek, *What is the Machine Learning?*, Phys. Rev. D 97, 056009 (2018), arXiv:1709.10106 | T3.5 (planing) |
-| G. Louppe, M. Kagan and K. Cranmer, *Learning to Pivot with Adversarial Networks*, NeurIPS 30 (2017), arXiv:1611.01046 | T3.5 |
-| C. Shimmin et al., *Decorrelated Jet Substructure Tagging using Adversarial Neural Networks*, Phys. Rev. D 96, 074034 (2017), arXiv:1703.03507 | T3.5 |
-| L. Bradshaw, R. K. Mishra, A. Mitridate and B. Ostdiek, *Mass Agnostic Jet Taggers*, preprint (2019), arXiv:1908.08959 | T3.5 |
-| G. Kasieczka and D. Shih, *DisCo Fever: Robust Networks Through Distance Correlation*, Phys. Rev. Lett. 125, 122001 (2020), arXiv:2001.05310 | T3.5 (DisCo) |
-| O. Kitouni, B. Nachman, C. Weisser and M. Williams, *Enhancing searches for resonances with machine learning and moment decomposition*, JHEP 2021, 70 (2021), arXiv:2010.09745 | T3.5 |
-
-### Interpretability (T5)
+**Start here:** Alain and Bengio on linear probes before `W3.1`, and Dillon et al., *Symmetries, Safety, and
+Self-Supervision* (JetCLR), before `W3.3.3` and `W3.4`. The papers on IRC safety of `W3.3` are at the end of this list.
 
 | reference | used in |
 |---|---|
-| M. Sundararajan, A. Taly and Q. Yan, *Axiomatic Attribution for Deep Networks*, ICML 2017, PMLR 70 (2017), arXiv:1703.01365 | T5.1 (read first) |
-| K. Simonyan, A. Vedaldi and A. Zisserman, *Deep Inside Convolutional Networks: Visualising Image Classification Models and Saliency Maps*, preprint (2013), arXiv:1312.6034 | T5.1 (saliency) |
-| D. Smilkov et al., *SmoothGrad: removing noise by adding noise*, preprint (2017), arXiv:1706.03825 | T5.7 |
-| S. Abnar and W. Zuidema, *Quantifying Attention Flow in Transformers*, ACL (2020), arXiv:2005.00928 | T5.7 (attention rollout) |
-| S. Jain and B. C. Wallace, *Attention is not Explanation*, NAACL (2019), arXiv:1902.10186 | T5.3 (read first) |
-| F. Mokhtar, R. Kansal and J. Duarte, *Do graph neural networks learn traditional jet substructure?*, preprint (2022), arXiv:2211.09912 | T5 |
-| A. Khot, M. S. Neubauer and A. Roy, *A Detailed Study of Interpretability of Deep Neural Network based Top Taggers*, preprint (2022), arXiv:2210.04371 | T5 |
-| G. Agarwal et al., *Explainable AI for ML jet taggers using expert variables and layerwise relevance propagation*, preprint (2020), arXiv:2011.13466 | T5.7 (LRP) |
-| A. Chakraborty, S. H. Lim and M. M. Nojiri, *Interpretable Deep Learning for Two-Prong Jet Classification with Jet Spectra*, JHEP 2019, 135 (2019), arXiv:1904.02092 | T5 |
-| C. Grojean, A. Paul, Z. Qian and I. Strümke, *Interpretable machine learning in Physics*, preprint (2022), arXiv:2203.08021 | T5 |
-| A. Wang et al., *Interpreting Transformers for Jet Tagging*, preprint (2024), arXiv:2412.03673 | T5.3, T7.3 |
-| T. Legge et al., *Why Is Attention Sparse In Particle Transformer?*, preprint (2025), arXiv:2512.00210 | T5.3, T7.3 |
-| S. Rai and S. Ganguly, *Dissecting Jet-Tagger Through Mechanistic Interpretability*, preprint (2026), arXiv:2605.09881 | T5.6, T7.3 |
-| S. Choi, S. J. Lee and M. Perelstein, *Infrared Safety of a Neural-Net Top Tagging Algorithm*, preprint (2018), arXiv:1806.01263 | T5.5 |
-| M. J. Dolan and A. Ore, *Equivariant Energy Flow Networks for Jet Tagging*, Phys. Rev. D 103, 074022 (2021), arXiv:2012.00964 | T5.5 |
-| P. Konar, V. S. Ngairangbam and M. Spannowsky, *Energy-weighted Message Passing: an infra-red and collinear safe graph neural network algorithm*, JHEP 02 (2022) 060, arXiv:2109.14636 | T5.5 |
-| A. Romero et al., *Safety of Quark/Gluon Jet Classification*, preprint (2021), arXiv:2103.09103 | T5.5 |
+| G. Alain and Y. Bengio, *Understanding intermediate layers using linear classifier probes*, preprint (2016), arXiv:1610.01644 | `W3.1.2` |
+| B. M. Dillon et al., *Symmetries, Safety, and Self-Supervision*, SciPost Phys. 12, 188 (2022), arXiv:2108.04253 | `W3.3.3`, `W3.4` |
+| J. Hewitt and P. Liang, *Designing and Interpreting Probes with Control Tasks*, EMNLP (2019), arXiv:1909.03368 | `W3.1.2` (control tasks) |
+| Y. Belinkov, *Probing Classifiers: Promises, Shortcomings, and Advances*, Comput. Linguist. 48, 207 (2022), arXiv:2102.12452 | `W3.1.2` |
+| S. Kornblith, M. Norouzi, H. Lee and G. Hinton, *Similarity of Neural Network Representations Revisited*, ICML 2019, PMLR 97 (2019), arXiv:1905.00414 | `W3.1.5` |
+| L. McInnes, J. Healy and J. Melville, *UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction*, preprint (2018), arXiv:1802.03426 | `W3.1.3` |
+| T. Faucett, J. Thaler and D. Whiteson, *Mapping Machine-Learned Physics into a Human-Readable Space*, Phys. Rev. D 103, 036020 (2021), arXiv:2010.11998 | `W3.1.2`, `W3.1.5` |
+| K. Datta, A. Larkoski and B. Nachman, *Automating the Construction of Jet Observables with Machine Learning*, Phys. Rev. D 100, 095016 (2019), arXiv:1902.07180 | week 3 |
+| R. Das, G. Kasieczka and D. Shih, *Feature Selection with Distance Correlation*, preprint (2022), arXiv:2212.00046 | week 3 |
+| J. Dolen et al., *Thinking outside the ROCs: Designing Decorrelated Taggers (DDT) for jet substructure*, JHEP 05 (2016) 156, arXiv:1603.00027 | `W3.2.3`-`W3.2.5` |
+| S. Chang, T. Cohen and B. Ostdiek, *What is the Machine Learning?*, Phys. Rev. D 97, 056009 (2018), arXiv:1709.10106 | `W3.2.4` (planing) |
+| G. Louppe, M. Kagan and K. Cranmer, *Learning to Pivot with Adversarial Networks*, NeurIPS 30 (2017), arXiv:1611.01046 | `W3.2.3`-`W3.2.5` |
+| C. Shimmin et al., *Decorrelated Jet Substructure Tagging using Adversarial Neural Networks*, Phys. Rev. D 96, 074034 (2017), arXiv:1703.03507 | `W3.2.3`-`W3.2.5` |
+| L. Bradshaw, R. K. Mishra, A. Mitridate and B. Ostdiek, *Mass Agnostic Jet Taggers*, preprint (2019), arXiv:1908.08959 | `W3.2.3`-`W3.2.5` |
+| G. Kasieczka and D. Shih, *DisCo Fever: Robust Networks Through Distance Correlation*, Phys. Rev. Lett. 125, 122001 (2020), arXiv:2001.05310 | `W3.2.5` (DisCo) |
+| O. Kitouni, B. Nachman, C. Weisser and M. Williams, *Enhancing searches for resonances with machine learning and moment decomposition*, JHEP 2021, 70 (2021), arXiv:2010.09745 | `W3.2.3`-`W3.2.5` |
+| T. Chen, S. Kornblith, M. Norouzi and G. Hinton, *A Simple Framework for Contrastive Learning of Visual Representations*, ICML 2020, PMLR 119 (2020), arXiv:2002.05709 | `W3.4.1`-`W3.4.2` |
+| B. M. Dillon et al., *Anomalies, Representations, and Self-Supervision*, SciPost Phys. Core 7, 056 (2024), arXiv:2301.04660 | `W3.4` |
+| P. T. Komiske, E. M. Metodiev and J. Thaler, *Energy flow polynomials: A complete linear basis for jet substructure*, JHEP 04 (2018) 013, arXiv:1712.07124 | `W3.3.2`, observables.md#irc-safety |
+| A. J. Larkoski and J. Thaler, *Unsafe but Calculable: Ratios of Angularities in Perturbative QCD*, JHEP 09 (2013) 137, arXiv:1307.1699 | `W3.3.4` (Sudakov safety) |
+| A. J. Larkoski, S. Marzani and J. Thaler, *Sudakov Safety in Perturbative QCD*, Phys. Rev. D 91, 111501 (2015), arXiv:1502.01719 | `W3.3.4` (Sudakov safety) |
 
-### Self-supervised learning and foundation models (T6, T7)
+### Week 4: JetClass, ParT and interpretability
+
+**Start here:** the ParT paper (week 2) for JetClass and `ParT_kin`. Then read Sundararajan, Taly and Yan on integrated
+gradients before `W4.4`, and Jain and Wallace, *Attention is not Explanation*, for the stretch questions of `W4.5`.
 
 | reference | used in |
 |---|---|
-| T. Chen, S. Kornblith, M. Norouzi and G. Hinton, *A Simple Framework for Contrastive Learning of Visual Representations*, ICML 2020, PMLR 119 (2020), arXiv:2002.05709 | T6.2 |
-| B. M. Dillon et al., *Symmetries, Safety, and Self-Supervision*, SciPost Phys. 12, 188 (2022), arXiv:2108.04253 | T6 (read first) |
-| B. M. Dillon et al., *Anomalies, Representations, and Self-Supervision*, SciPost Phys. Core 7, 056 (2024), arXiv:2301.04660 | T6 |
-| T. Golling et al., *Masked Particle Modeling on Sets: Towards Self-Supervised High Energy Physics Foundation Models*, Mach. Learn.: Sci. Technol. 5, 035074 (2024), arXiv:2401.13537 | T7.1, T7.3 |
-| M. Leigh et al., *Is Tokenization Needed for Masked Particle Modelling?*, preprint (2024), arXiv:2409.12589 | T7.1 |
-| J. Birk, A. Hallin and G. Kasieczka, *OmniJet-α: The first cross-task foundation model for particle physics*, Mach. Learn.: Sci. Technol. 5, 035031 (2024), arXiv:2403.05618 | T7 |
-| J. Birk et al., *OmniJet-α_C: Learning point cloud calorimeter simulations using generative transformers*, preprint (2025), arXiv:2501.05534 | T7 |
-| V. Mikuni and B. Nachman, *Solving Key Challenges in Collider Physics with Foundation Models*, Phys. Rev. D 111, L051504 (2025), arXiv:2404.16091 | T7 |
-| P. Harris et al., *Re-Simulation-based Self-Supervised Learning for Pre-Training Foundation Models*, Phys. Rev. D 111, 032010 (2025), arXiv:2403.07066 | T7 |
-| Z. Zhao et al., *Large-Scale Pretraining and Finetuning for Efficient Jet Classification in Particle Physics*, preprint (2024), arXiv:2408.09343 | T6.7, T7 |
-| C. Li et al., *Accelerating Resonance Searches via Signature-Oriented Pre-training*, preprint (2024), arXiv:2405.12972 | T7 |
-| J. Bardhan et al., *HEP-JEPA: A foundation model for collider physics using joint embedding predictive architecture*, preprint (2025), arXiv:2502.03933 | T7 |
-| K. He et al., *Masked Autoencoders Are Scalable Vision Learners*, CVPR (2022), arXiv:2111.06377 | T7.1 |
-| J. Devlin, M.-W. Chang, K. Lee and K. Toutanova, *BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding*, NAACL (2019), arXiv:1810.04805 | T7.1 |
+| M. Sundararajan, A. Taly and Q. Yan, *Axiomatic Attribution for Deep Networks*, ICML 2017, PMLR 70 (2017), arXiv:1703.01365 | `W4.4.2` |
+| S. Jain and B. C. Wallace, *Attention is not Explanation*, NAACL (2019), arXiv:1902.10186 | `W4.5.3`-`W4.5.4` |
+| K. Simonyan, A. Vedaldi and A. Zisserman, *Deep Inside Convolutional Networks: Visualising Image Classification Models and Saliency Maps*, preprint (2013), arXiv:1312.6034 | `W4.4.1` (saliency) |
+| D. Smilkov et al., *SmoothGrad: removing noise by adding noise*, preprint (2017), arXiv:1706.03825 | `W4.5.9` |
+| S. Abnar and W. Zuidema, *Quantifying Attention Flow in Transformers*, ACL (2020), arXiv:2005.00928 | `W4.5.9` (attention rollout) |
+| F. Mokhtar, R. Kansal and J. Duarte, *Do graph neural networks learn traditional jet substructure?*, preprint (2022), arXiv:2211.09912 | week 4 |
+| A. Khot, M. S. Neubauer and A. Roy, *A Detailed Study of Interpretability of Deep Neural Network based Top Taggers*, preprint (2022), arXiv:2210.04371 | week 4 |
+| G. Agarwal et al., *Explainable AI for ML jet taggers using expert variables and layerwise relevance propagation*, preprint (2020), arXiv:2011.13466 | `W4.5.9` (LRP) |
+| A. Chakraborty, S. H. Lim and M. M. Nojiri, *Interpretable Deep Learning for Two-Prong Jet Classification with Jet Spectra*, JHEP 2019, 135 (2019), arXiv:1904.02092 | week 4 |
+| C. Grojean, A. Paul, Z. Qian and I. Strümke, *Interpretable machine learning in Physics*, preprint (2022), arXiv:2203.08021 | week 4 |
+| A. Wang et al., *Interpreting Transformers for Jet Tagging*, preprint (2024), arXiv:2412.03673 | `W4.5.3`, `B.4` |
+| T. Legge et al., *Why Is Attention Sparse In Particle Transformer?*, preprint (2025), arXiv:2512.00210 | `W4.5.3`, `B.4` |
+| S. Rai and S. Ganguly, *Dissecting Jet-Tagger Through Mechanistic Interpretability*, preprint (2026), arXiv:2605.09881 | `W4.2.9`, `B.4` |
+| S. Choi, S. J. Lee and M. Perelstein, *Infrared Safety of a Neural-Net Top Tagging Algorithm*, preprint (2018), arXiv:1806.01263 | `W4.3` |
+| M. J. Dolan and A. Ore, *Equivariant Energy Flow Networks for Jet Tagging*, Phys. Rev. D 103, 074022 (2021), arXiv:2012.00964 | `W4.3` |
+| P. Konar, V. S. Ngairangbam and M. Spannowsky, *Energy-weighted Message Passing: an infra-red and collinear safe graph neural network algorithm*, JHEP 02 (2022) 060, arXiv:2109.14636 | `W4.3` |
+| A. Romero et al., *Safety of Quark/Gluon Jet Classification*, preprint (2021), arXiv:2103.09103 | `W4.3` |
+
+### Bonus: foundation models and masked particle modelling
+
+| reference | used in |
+|---|---|
+| P. T. Komiske, E. M. Metodiev and J. Thaler, *The Metric Space of Collider Events*, Phys. Rev. Lett. 123, 041801 (2019), arXiv:1902.02346 | bonus |
+| T. Golling et al., *Masked Particle Modeling on Sets: Towards Self-Supervised High Energy Physics Foundation Models*, Mach. Learn.: Sci. Technol. 5, 035074 (2024), arXiv:2401.13537 | `B.2`, `B.4` |
+| M. Leigh et al., *Is Tokenization Needed for Masked Particle Modelling?*, preprint (2024), arXiv:2409.12589 | `B.2` |
+| J. Birk, A. Hallin and G. Kasieczka, *OmniJet-α: The first cross-task foundation model for particle physics*, Mach. Learn.: Sci. Technol. 5, 035031 (2024), arXiv:2403.05618 | bonus |
+| J. Birk et al., *OmniJet-α_C: Learning point cloud calorimeter simulations using generative transformers*, preprint (2025), arXiv:2501.05534 | bonus |
+| V. Mikuni and B. Nachman, *Solving Key Challenges in Collider Physics with Foundation Models*, Phys. Rev. D 111, L051504 (2025), arXiv:2404.16091 | bonus |
+| P. Harris et al., *Re-Simulation-based Self-Supervised Learning for Pre-Training Foundation Models*, Phys. Rev. D 111, 032010 (2025), arXiv:2403.07066 | bonus |
+| Z. Zhao et al., *Large-Scale Pretraining and Finetuning for Efficient Jet Classification in Particle Physics*, preprint (2024), arXiv:2408.09343 | `B.1`, bonus |
+| C. Li et al., *Accelerating Resonance Searches via Signature-Oriented Pre-training*, preprint (2024), arXiv:2405.12972 | bonus |
+| J. Bardhan et al., *HEP-JEPA: A foundation model for collider physics using joint embedding predictive architecture*, preprint (2025), arXiv:2502.03933 | bonus |
+| K. He et al., *Masked Autoencoders Are Scalable Vision Learners*, CVPR (2022), arXiv:2111.06377 | `B.2` |
+| J. Devlin, M.-W. Chang, K. Lee and K. Toutanova, *BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding*, NAACL (2019), arXiv:1810.04805 | `B.2` |
 
 ### Outlook: symmetry-aware networks (stage B)
 

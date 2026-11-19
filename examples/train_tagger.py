@@ -6,17 +6,19 @@ is validated after every epoch on the val part and evaluated once on the test pa
 
     python examples/train_tagger.py --model pfn --data data/t2_detector.parquet --train-size 105000 --epochs 10
     python examples/train_tagger.py --model partsmall --train-size 30000 --epochs 5 --out models/toy/partsmall
-    python examples/train_tagger.py --course-models      # the T2 models of the course into models/toy/ (about 35 min)
+    python examples/train_tagger.py --course-models      # the week-2 course models into models/toy/ (about 35 min)
+    python examples/train_tagger.py --course-models --out models/course --results models/course/results_table.csv
 
 With ``--out PREFIX`` (default ``runs/<model>``) it writes ``PREFIX.pt`` (the model with its configuration, read
 back with ``itj.models.load_model``), ``PREFIX_history.json`` (loss, accuracy and speed per epoch),
 ``PREFIX_scores.npz`` (the test probabilities with the labels, ``jet_sdmass`` and ``jet_pt``), ``PREFIX_roc.png``
 (if matplotlib is installed) and appends a row to ``results_table.csv`` (``--results``).
 
-By default the script uses half of the cores (``--threads``), so that two trainings run side by side, as T2.4
-suggests for the two ParT-small models. ``--course-models`` trains, one after the other with seed 0, the models that
-the later tasks use when a student's own models of T2 failed: ``pfn`` and ``efn`` (105 000 jets, 10 epochs),
-``pnlite`` (60 000 jets, 5 epochs), ``partsmall`` and ``partsmall_nopair`` (30 000 jets, 5 epochs each).
+By default the script uses half of the cores (``--threads``), so that two trainings can run side by side; the
+start-of-week box of week 2 passes ``--threads`` (the cores minus two) so that the student's own work stays responsive.
+``--course-models`` trains, one after the other with seed 0, the models of weeks 2 to 4 (TASKS.md writes them into
+``models/course/`` with the last command above): ``pfn`` and ``efn`` (105 000 jets, 10 epochs), ``pnlite`` (60 000
+jets, 5 epochs), ``partsmall`` and ``partsmall_nopair`` (30 000 jets, 5 epochs each).
 """
 
 from __future__ import annotations
@@ -31,7 +33,7 @@ from pathlib import Path
 
 import numpy as np
 
-#: The T2 models of the course: (preset, training jets, epochs), trained by ``--course-models`` into models/toy/.
+#: The course models of week 2: (preset, training jets, epochs), trained by ``--course-models`` (default models/toy/).
 COURSE_MODELS: tuple[tuple[str, int, int], ...] = (
     ("pfn", 105_000, 10),
     ("efn", 105_000, 10),
@@ -46,6 +48,21 @@ LABEL_SETS: dict[str, tuple[int, tuple[int, int, int] | None]] = {
     "jetclass10": (10, (7, 8, 0)),
     "qg": (2, None),
 }
+
+
+#: The data block of TASKS.md that makes a file, by the stem prefix of its name (the stems keep the task numbers of
+#: release 0.1); tests/test_task_data.py checks it against ``block_for`` of examples/make_task_data.py.
+DATA_BLOCKS = {"t1_": "--week 1", "t2_": "--week 2", "t3_": "--week 3", "t6_": "--week 3", "t7_": "--week 4"}
+
+
+def data_block(path: str | Path) -> str | None:
+    """Return the options of ``examples/make_task_data.py`` that make ``path``, or None for a file of no data block."""
+    path = Path(path)
+    if "t2_split" in path.parts or ("jetclass" in path.parts and "split" in path.parts):
+        return "--week 4"
+    if "jetclass" in path.parts:
+        return "--week 4 --only fetch" if {"val", "example"} & set(path.parts) else None
+    return next((block for prefix, block in DATA_BLOCKS.items() if path.name.startswith(prefix)), None)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -85,7 +102,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--course-models",
         action="store_true",
-        help="train the T2 models of the course into models/toy/ (--train-size and --epochs then cap their sizes)",
+        help="train the week-2 course models into models/toy/ or --out (--train-size and --epochs cap their sizes)",
     )
     return parser.parse_args(argv)
 
@@ -278,7 +295,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     for path in args.data:
         if not Path(path).exists():
-            print(f"{path} is missing: make it with python examples/make_task_data.py --week 1", file=sys.stderr)
+            block = data_block(path)
+            how = "check the path (examples/make_task_data.py makes the data of TASKS.md)"
+            if block:
+                how = f"make it with python examples/make_task_data.py {block}"
+            print(f"{path} is missing: {how}", file=sys.stderr)
             return 1
     common = {
         "data": args.data,

@@ -1,6 +1,6 @@
 """Training and inference on the CPU: :func:`fit`, :func:`predict`, :class:`History` and the thread and seed helpers.
 
-:func:`fit` is the reference training loop of the course (students write their own first loop in T2.3, then may use
+:func:`fit` is the reference training loop of the course (students write their own first loop in W2.3.3, then may use
 it): AdamW with a cosine schedule, (weighted) cross entropy, the best state by validation loss restored at the end,
 an ETA printed after 20 batches, a time limit (``max_minutes``) and early stopping (``patience``). On the CPU a run
 is deterministic for a given seed and initial model.
