@@ -54,12 +54,12 @@ momentum across the beam. Each of them becomes a **jet**, a narrow spray of part
 
 The jets of this course carry a lot of momentum. The toy starts every jet from a quark, gluon, W or top (all introduced
 in [The particles](#the-particles)). The momentum of this first particle across the beam (the $p_T$ of section 3) lies
-between 450 and 1100 GeV. The number of jets falls steeply with $p_T$. Nearly all jets of the toy files of weeks 1-3 lie
-between about 450 and 900 GeV (median about 540 GeV), with a few from 200 GeV to 1.3 TeV. JetClass (a large public set
-of simulated jets; see [jetclass.md](jetclass.md#the-data-set)) and the comparisons of week 4 use 500-1000 GeV. The
-particles of such a jet have energies from a fraction of a GeV to hundreds of GeV, far above their masses. They move
-almost at the speed of light. The speed of a particle is $v/c = p/E$, which is already $0.99990$ for a pion (the
-lightest hadron; $m = 0.14$ GeV) of 10 GeV.
+between 450 and 1100 GeV. The number of jets falls steeply with $p_T$. Nine jets in ten of the toy files of weeks 1-3
+lie between about 440 and 900 GeV (median about 540 GeV), and a few lie as far out as 200 GeV or 1.3 TeV. JetClass (a
+large public set of simulated jets; see [jetclass.md](jetclass.md#the-data-set)) and the comparisons of week 4 use
+500-1000 GeV. The particles of such a jet have energies from a fraction of a GeV to hundreds of GeV, far above their
+masses. They move almost at the speed of light. The speed of a particle is $v/c = p/E$, which is already $0.99990$ for
+a pion (the lightest hadron; $m = 0.14$ GeV) of 10 GeV.
 
 **Check yourself.** (1a) What is the energy of a 1 TeV jet in joules, roughly, and is that a lot? (1b) Is a particle
 with $E = 5$ GeV and $p = 3$ GeV possible, and what is its mass?

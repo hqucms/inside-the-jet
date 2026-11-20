@@ -15,7 +15,7 @@
   squares that each record one deposited energy).
 
 The jet is then built as in JetClass, the large public set of simulated jets that the course compares with
-([jetclass.md](jetclass.md)). This page defines the model as implemented in `itj.toy` (version 0.2.0, unchanged since
+([jetclass.md](jetclass.md)). This page defines the model as implemented in `itj.toy` (version 0.2.1, unchanged since
 0.1.1) and gives the derivations that the questions use. The defaults are those of the `detector` preset, the last rung
 of the ladder below, with every stage on ([Presets](#presets)). The data files are described in
 [data_format.md](data_format.md) and the observables in [observables.md](observables.md). The literature values behind
@@ -973,17 +973,21 @@ five hidden shortcuts, chosen from the seed. It stores the shortcut only in scra
 The strengths are calibrated so that a PFN gains a few per cent of accuracy from the shortcut. A PFN (Particle Flow
 Network) is a network that sums a learned function over the particles ([models.md](models.md#pfn-and-efn)). The last
 column is the gain in test accuracy of a PFN over the same PFN on the clean file (accuracy 0.921). The PFN uses `kin`
-features and trains for 10 epochs on the 42 000 training jets of a 60 000-jet file (one 2016 CPU, about 2.5 minutes).
-Tested on clean jets, the same PFN loses 8-26 % of accuracy. `cell_grid` is the exception. The grid lives in absolute
-$(\eta, \phi)$, which a per-particle model on $\Delta\eta$, $\Delta\phi$ cannot see. ParT-small (a small Particle
-Transformer; see [models.md](models.md#particle-transformer)) did not use it either in 4 epochs. The data still differ,
-so a jet display or the cell positions modulo the cell size find it. The known shortcut above gives the PFN 2.2 % with
-`kinpid` features (particle-type flags) and almost nothing (0.2 %) with `kin`. The mapping from the seed to the shortcut
-and the scrambling are in the source code (`itj.toy.mystery`): reading it spoils `B.3`. An instructor who wants a real
-hunt sets the environment variable `ITJ_MYSTERY_KEY` to a private number before generating the students' files. Both the
-mapping and the scrambling then depend on the key, and `--reveal` needs it too. The scrambling hides the answer from a
-glance, not from a determined reader. The files themselves show the shortcut to anyone who compares the classes (counts
-per process in `jetgen info`, the truth columns): that comparison is part of the hunt.
+features and trains for 10 epochs on the 42 000 training jets of a 60 000-jet file (about a minute on one 2016 six-core
+CPU). Tested on clean jets, the same PFN loses 8-26 % of accuracy. `cell_grid` is the exception. The grid lives in
+absolute $(\eta, \phi)$, which a per-particle model on $\Delta\eta$, $\Delta\phi$ cannot see. ParT-small (a small
+Particle Transformer; see [models.md](models.md#particle-transformer)) did not use it either in 4 epochs. The data still
+differ, so a jet display or the cell positions modulo the cell size find it. The known shortcut above gives the PFN
+2.2 % with `kinpid` features (particle-type flags) and almost nothing (0.2 %) with `kin`. The mapping from the seed to
+the shortcut and the scrambling are in the source code (`itj.toy.mystery`): reading it spoils `B.3`. An instructor who
+wants a real hunt sets the environment variable `ITJ_MYSTERY_KEY` to a long private random number before generating the
+students' files, for example `export ITJ_MYSTERY_KEY=$(python -c "import secrets; print(secrets.randbits(64))")`, and
+keeps it. Both the mapping and the scrambling then depend on the key, and `--reveal` needs it too. A wrong key fails to
+decode, so a short key can be found by trying keys one after another. Each try costs a fraction of a second, because the
+key is stretched first (PBKDF2), so a key of six digits still falls in a few days of CPU, and
+`jetgen generate --mystery` warns about any key of fewer than 13 digits. The scrambling hides the answer from a glance,
+not from a determined reader. The files themselves show the shortcut to anyone who compares the classes (counts per
+process in `jetgen info`, the truth columns): that comparison is part of the hunt.
 
 ## Reproducibility
 

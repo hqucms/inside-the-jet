@@ -41,7 +41,7 @@ Particle Transformer (ParT), the transformer trained on it. The repository `insi
 
 | stage | content                                                                                                   | status               |
 |-------|-----------------------------------------------------------------------------------------------------------|----------------------|
-| A     | **A Spray of Hadrons** and JetClass: a four-week course from jets to taggers, representations and interpretability ([TASKS.md](TASKS.md)) | this release (0.2.0) |
+| A     | **A Spray of Hadrons** and JetClass: a four-week course from jets to taggers, representations and interpretability ([TASKS.md](TASKS.md)) | this release (0.2.1) |
 | B     | TBD                                                                                                       | next                 |
 
 ## The toy jets

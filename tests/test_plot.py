@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -190,6 +191,44 @@ def test_attention_and_attribution(jets: JetData) -> None:
     ax = plot.attribution_display(jets, 3, attr)
     assert any("signed" in a.get_ylabel() for a in ax.figure.axes)
     plot.attribution_display(jets, 3, attr[3], absolute=True)
+
+
+def test_attribution_display_colour_map_can_be_fixed(jets: JetData) -> None:
+    """A gallery of signed maps shares one colour map with ``signed=True``; ``label`` names what is drawn."""
+    rng = np.random.default_rng(1)
+    attr = np.abs(rng.normal(size=(len(jets), 64)))  # signed attributions that happen to be all positive
+
+    def drawn(**kwargs):
+        ax = plot.attribution_display(jets, 3, attr, **kwargs)
+        bar = next(a for a in ax.figure.axes if a is not ax)
+        return ax.collections[0].get_cmap().name, bar.get_ylabel(), ax.collections[0].norm
+
+    cmap, label, _ = drawn()
+    assert (cmap, label) == ("viridis", "attribution")  # unchanged default: the map follows the values
+    cmap, label, norm = drawn(signed=True)
+    assert (cmap, label) == ("RdBu_r", "attribution (signed)")
+    assert norm.vmin == pytest.approx(-norm.vmax)  # centred on 0
+    cmap, label, _ = drawn(signed=False, label="IG")
+    assert (cmap, label) == ("viridis", "IG")
+    cmap, label, _ = drawn(absolute=True, label="saliency")
+    assert (cmap, label) == ("viridis", "saliency (absolute)")
+    with pytest.raises(ValueError, match="not signed"):
+        plot.attribution_display(jets, 3, attr, absolute=True, signed=True)
+    nan = np.full_like(attr, np.nan)  # a jet whose attributions are all NaN still draws, on every colour map
+    for signed in (None, True, False):
+        plot.attribution_display(jets, 3, nan, signed=signed)
+
+
+def test_w441_hint_labels_the_saliency_map_absolute(jets: JetData) -> None:
+    """The call that the W4.4.1 hint gives draws a colour bar that says "absolute", as its deliverable asks."""
+    text = (Path(__file__).resolve().parents[1] / "tasks" / "week4.md").read_text()
+    hint = text.split("- **W4.4.1:**", 1)[1].split("\n- **", 1)[0]
+    call = re.search(r"`itj\.plot\.attribution_display\((jet, 0, values[^`]*)\)`", hint)
+    assert call, "the W4.4.1 hint no longer gives the attribution_display call"
+    values = np.abs(np.random.default_rng(2).normal(size=(len(jets), 64)))  # saliency: never negative
+    ax = eval(f"plot.attribution_display({call.group(1)})", {"plot": plot, "jet": jets, "values": values})
+    bar = next(a for a in ax.figure.axes if a is not ax)
+    assert bar.get_ylabel().endswith(("(absolute)", "(signed)")), bar.get_ylabel()
 
 
 def test_efn_filters() -> None:

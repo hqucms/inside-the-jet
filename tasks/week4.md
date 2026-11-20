@@ -118,8 +118,10 @@ print(test)  # JetData(60 000 jets: ...; JetClass; ... particles)
 section 9](../docs/primer.md#what-a-detector-sees) (Delphes). Then make a short dictionary of the JetClass columns of
 week 1: `part_px` ... `part_energy`, `part_deta`, `part_dphi`, `jet_pt`, `jet_eta`, `jet_sdmass`, `jet_tau1` to
 `jet_tau3`, `jet_nparticles` and the labels. Give the meaning of each in JetClass. Take `part_deta` and `part_dphi`
-from **W1.1.7** if you did it, otherwise from [primer section 3](../docs/primer.md#collider-coordinates). Also say which
-of them JetClass does not have (`jetgen info --columns` on a JetClass file and on a toy file).
+from **W1.1.7** if you did it, otherwise from [primer section 3](../docs/primer.md#collider-coordinates). Then compare
+the columns of the two data sets (`jetgen info --columns` on a JetClass file and on a toy file): which of the columns
+that your week-1 code read are missing from JetClass, and what does that mean for the questions you can ask on real
+jets?
 
 **W4.1.2** *Core, 75 min.* Toy against JetClass. Take 10 000 jets per class from each data set. From JetClass, take the
 first 10 000 jets of each test part. From `data/t2_detector.parquet`, take the first 10 000 jets per class after
@@ -159,9 +161,9 @@ Then train PN-lite (60 000 jets, 5 epochs, about 9-10 minutes, in the background
 ParT-small (30 000 jets, 5 epochs, about 12 minutes, in the background). Compare with **W4.2.2** (100 M jets and GPUs)
 and with the same models on the toy. Is JetClass harder, and for which pair of classes?
 
-**Deliverables:** the dictionary table (**W4.1.1**); `W4.1.2_toy_vs_jetclass.pdf` and the table of medians (**W4.1.2**);
-the extended table (**W4.1.3**); the two fractions and the sign check (**W4.1.4**, **W4.1.5**); the full table
-(**W4.1.6**); `W4.1.7_roc_jetclass.pdf` and the rows (**W4.1.7**).
+**Deliverables:** the dictionary table and the missing columns (**W4.1.1**); `W4.1.2_toy_vs_jetclass.pdf` and the table
+of medians (**W4.1.2**); the extended table (**W4.1.3**); the two fractions and the sign check (**W4.1.4**, **W4.1.5**);
+the full table (**W4.1.6**); `W4.1.7_roc_jetclass.pdf` and the rows (**W4.1.7**).
 
 **Hints**
 - **W4.1.1:** the labels of JetClass are one-hot branches for ten classes (one branch per class, set only for the true
@@ -214,7 +216,9 @@ of **W2.2.4**.
 where exactly `ParT_full` gains.
 
 **W4.2.6** *Stretch, 90 min.* More transfer. Four studies: the JetClass models of **W4.1.7** on the toy; the score
-distributions per class; the probes of **W3.1.2** across the two data sets. The fourth is fine-tuning: train the toy EFN
+distributions per class; probes across the two data sets: fit a linear probe (as in **W3.1.2**) on the embedding of
+the course PFN from toy jets and score it on JetClass jets, and the reverse, for the stored targets that both data sets
+have ($m_\mathrm{SD}$ from `jet_sdmass`, $\tau_{21}$ and $N$). The fourth is fine-tuning: train the toy EFN
 further on 1 000 or 10 000 JetClass jets, and compare with training from scratch (a look back at **W3.4.7**).
 
 **W4.2.7** *Stretch, 3.5 h.* weaver
@@ -318,7 +322,11 @@ collinear safe? Retrain it without `split_collinear` (about 2 minutes) and compa
   (`itj.augment.max_particles_guard` tells you whether it would). It keeps the sign of `part_deta` of the
   unperturbed jet.
 - **W4.3.4:** fold the scaler and the logistic regression of the linear head into one linear output layer, so that
-  `irc_scan` sees one model. Compare embedding scans only within one encoder.
+  `irc_scan` sees one model. To compare the embeddings of two encoders, use `mean_embed_dist_jets`, which divides by
+  the typical distance between the embeddings of two different jets (`mean_embed_dist` divides by the mean embedding
+  norm, which depends on the offset of each encoder). For the retraining, switch the splits off in the training views
+  only (`itj.ssl.two_views(jets, itj.ssl.JetCLRAugment(collinear_frac=0.0), rng)`), and keep the monitor views of
+  **W3.4.3** as they were, so that the alignment stays comparable.
 
 ## W4.4 Attributions on the toy (core path about 3.75 h, stretch about 3 h)
 
@@ -335,6 +343,7 @@ seconds). Do the bright particles sit on the prongs (`truth_part_prong`)?
 import itj.features
 import itj.interpret
 import itj.models
+import itj.plot
 import itj.train
 from itj.io import load
 
@@ -348,7 +357,8 @@ values = itj.interpret.saliency(model, itj.train.make_batch(jet), target=1)  # t
 ParT-small with 32 steps and the zero baseline, using `itj.interpret.input_gradients` for the gradients. Check
 completeness (the attributions sum to $s(x) - s(x_0)$), and compare with `itj.interpret.integrated_gradients(model,
 batch, target=..., steps=32)`. Then, on 250 W and 250 top jets, give the share of the attribution per prong and on the
-underlying event (about a minute).
+underlying event, with 128 steps (`steps=128`, about 2 minutes): 32 steps are enough to build and check your version,
+but not for the shares ([methods.md](../docs/methods.md#attributions)).
 
 **W4.4.3** *Core, 60 min.* Do attributions tell the truth? *Predict first:* how much does the W score drop when one W
 prong is removed, compared with removing as many random particles? Then do it on the toy W jets for ParT-small and the
@@ -370,13 +380,19 @@ $p_T$, and at random (several seeds). Plot the score against the fraction remove
 
 **Hints**
 - **W4.4.1:** saliency is a gradient with respect to the inputs: the change of the score when one input of one particle
-  changes a little. `target=1` is the W output of the toy models (QCD 0, W 1, top 2).
+  changes a little. `target=1` is the W output of the toy models (QCD 0, W 1, top 2). Name it on the colour bar:
+  `itj.plot.attribution_display(jet, 0, values, absolute=True, label="saliency")`, because a slope is not a
+  contribution ([methods.md](../docs/methods.md#attributions)). Saliency is the length of a gradient, so it is never
+  negative, and `absolute=True` writes "(absolute)" on the colour bar.
 - **W4.4.2:** never call `.backward()` on the raw vectors of ParT yourself, because the pair features of a particle with
   itself give NaN gradients; use `input_gradients`. Build it in three steps: the 32 inputs on the straight line from the
   baseline to the jet; the mean of their gradients; times (input minus baseline). Check completeness on one jet before
   you run 500. Say whether a map is signed or absolute.
 - **W4.4.3:** use several random draws for the random removal.
 - **W4.4.4:** [methods.md](../docs/methods.md#attributions) gives realistic completeness gaps; report both baselines.
+  By default `attribution_display` picks the colour map from the values of each jet, so a jet whose attributions are
+  all positive gets another map. Pass `signed=True`, so that the five displays use the same diverging map centred on
+  0; each keeps its own scale, so read the colour bar of each display before you compare colours.
 
 ## W4.5 Where does the real ParT look? (core path about 1.25 h, stretch about 8.5 h)
 
@@ -389,9 +405,12 @@ Check it against `truth_part_prong` on 250 toy W jets of the test part of `data/
 agree? Give the agreement with its error.
 
 **W4.5.2** *Core, 45 min.* Where does the real ParT look? Run integrated gradients (the library version, zero baseline)
-with `ParT_kin` on 200 JetClass W jets (`integrated_gradients(model, batch, target=7)`: Wqq among the ten classes, as in
-notebook 01; one or two minutes). Give the share of the attribution per subjet of the proxy and outside both. What can
-you say without truth, and how does it compare with the toy (**W4.4.2**)? This figure goes into your final summary.
+with `ParT_kin` on 200 JetClass W jets (`integrated_gradients(model, batch, target=7)`: Wqq among the ten classes;
+notebook 01 uses `target=8`, Tbqq, for its top jet; one or two minutes). Before you give shares, check the gap that it
+returns against $s(x) - s(x_0)$, as in **W4.4.2**; if the gap is not small, use more steps (`steps=128` takes about
+four times as long; [methods.md](../docs/methods.md#attributions)), and say which number of steps you used. Give the
+share of the attribution per subjet of the proxy and outside both. What can you say without truth, and how does it
+compare with the toy (**W4.4.2**)? This figure goes into your final summary.
 
 **W4.5.3** *Stretch, 75 min.* Prong heads? First draw one picture: the attention matrix of one head for one toy W jet
 (`model.trace(make_batch(jets), attention=True).attention["block2"]`, cut to the real particles, drawn with
@@ -418,8 +437,9 @@ $U$ is?
 use? Then replace one pair channel at a time by its mean (`itj.interpret.ablate_pair_channels`) and report the change of
 the AUC. Does it predict **W4.5.5**? (Replacing all four channels at once by their mean is the same as $U = 0$.)
 
-**W4.5.8** *Stretch, 45 min.* One pair channel. Retrain ParT-small with `pair_input_dim=1` (about 6 minutes, in the
-background) and compare with **W4.5.5**.
+**W4.5.8** *Stretch, 45 min.* One pair channel. Retrain ParT-small with `pair_input_dim=1` and compare with **W4.5.5**.
+The run takes about 14 minutes, in the background: it keeps the pair embedding on all pairs, so it costs about as much
+as `partsmall`.
 
 **W4.5.9** *Stretch, 2 h.* Your own question. One example is SmoothGrad, saliency averaged over noisy copies of the
 input. Another is attention rollout, attention multiplied through the blocks (arXiv:2005.00928,

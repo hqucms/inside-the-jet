@@ -95,32 +95,37 @@ for epoch in range(8):
 ```
 
 Evaluate `ema.model` and `model` on both readouts as you evaluated the MPM encoder. Compare them with the same network
-before pretraining (`set_seed(0)` and `build_model` again). Does predicting representations beat predicting particles
-here? A JEPA can make its loss small by giving every jet almost the same representation, which is called collapse. The
-effective rank printed after every epoch counts how many directions the class tokens of the held-out jets really use:
-about 1 for a collapsed encoder, at most 64 for ParT-small
-([glossary](../docs/glossary.md#machine-learning-and-statistics)). Compute it for your MPM encoder too. Then ask how
-much the predictor needs the encoder at all. Train a fresh `JEPAPredictor(64)` for 300 steps (about 2 minutes) against
-the trained target encoder, with the encoder output replaced by zeros
-(`torch.zeros(*view.batch.particle_mask.shape, 64)` and no `cls`), so that it sees only where the particles are. Compare
-its loss on the held-out jets with that of your trained predictor (a predictor that always outputs 0 scores 1 on the
-layer-normalised targets). What do the effective rank and this positions-only predictor show? The JEPA papers pretrain
-on far more jets and for far more steps: why might a JEPA need far more steps or data than this budget? One caveat to
-think about: in pretraining the encoder never sees a whole jet. Its input BatchNorm (the layer that standardises the
-inputs with statistics gathered in training) learns the statistics of half-jets, and the target encoder copies them.
-What could that do to the evaluation on full jets? A further idea, not counted in the time: the masked-autoencoder
-variant of the MPM (`mask_particles(..., drop=True)` with `MaskedParticleDecoder(64, 3, num_layers=1)`;
+before pretraining (`set_seed(0)` and `build_model` again). One seed gives one start and one gain: compare the gain of
+each run over its own start, and run a second seed (`set_seed(1)` for the start and the pretraining) if time allows
+before you answer. Does predicting representations beat predicting particles here? A JEPA can make its loss small by
+giving every jet almost the same representation, which is called collapse. The effective rank printed after every epoch
+counts how many directions the class tokens of the held-out jets really use: about 1 for a collapsed encoder, at most 64
+for ParT-small ([glossary](../docs/glossary.md#machine-learning-and-statistics)). Compute it for your MPM encoder too.
+Then ask how much the predictor needs the encoder at all. Train a fresh `JEPAPredictor(64)` for 300 steps (about 2
+minutes) against the trained target encoder, with the encoder output replaced by zeros
+(`torch.zeros(*view.batch.particle_mask.shape, 64)` and no `cls`), so that it sees only where the particles are. Use the
+recipe of the loop so that the loss compares: AdamW with `lr=1e-3` and `weight_decay=0.01` and the cosine schedule of
+the loop with `total = 300`. Use the first 300 batches and masks of the loop (`np.random.default_rng(0)` again and
+`manual_seed(step)` for the masks). Compare its loss on the held-out jets with that of your trained predictor (a
+predictor that always outputs 0 scores 1 on the layer-normalised targets). What do the effective rank and this
+positions-only predictor show? The JEPA papers pretrain on far more jets and for far more steps: why might a JEPA need
+far more steps or data than this budget? One caveat to think about: in pretraining the encoder never sees a whole jet.
+Its input BatchNorm (the layer that standardises the inputs with statistics gathered in training) learns the statistics
+of half-jets, and the target encoder copies them. What could that do to the evaluation on full jets? If you try to
+repair it by re-estimating the BatchNorm statistics on full jets, judge the repair by the linear evaluation, not by how
+close the statistics come. A further idea, not counted in the time: the masked-autoencoder variant of the MPM
+(`mask_particles(..., drop=True)` with `MaskedParticleDecoder(64, 3, num_layers=1)`;
 [methods.md](../docs/methods.md#masked-particle-modelling)).
 
 **B.3** *Bonus, 6.5 h.* Shortcut hunting (needs **W3.1**, **W3.2** and **W4.4**). (a) A known shortcut. Train a PFN with
-the particle types, `build_model("pfn", feature_set="kinpid")` (about a minute), on `data/t7_shortcut.parquet`. These
-are W jets with a $\pi^0$ share of 0.50 instead of the default (the neutral pion decays to photons). Evaluate the PFN on
-clean W jets (`data/t2_detector.parquet`). Can saliency, integrated gradients summed by particle type or a probe for the
-photon fraction find the shortcut without being told? (b) A hidden shortcut. `data/t7_mystery.parquet` holds one of the
-five shortcuts of [physics.md](../docs/physics.md#planted-shortcuts). A first look at the counts per class
-(`jetgen info`, the truth columns) is part of the hunt and may already point at a suspect. The task is to show, with the
-tools of weeks 3 and 4 and with counterfactual edits, that a tagger trained on the file uses the shortcut. Then remove
-it, and only then run `jetgen info data/t7_mystery.parquet --reveal`.
+the particle types, `build_model("pfn", feature_set="kinpid")` (about a minute; 1.5 minutes with three threads), on
+`data/t7_shortcut.parquet`. These are W jets with a $\pi^0$ share of 0.50 instead of the default (the neutral pion
+decays to photons). Evaluate the PFN on clean W jets (`data/t2_detector.parquet`). Can saliency, integrated gradients
+summed by particle type or a probe for the photon fraction find the shortcut without being told? (b) A hidden shortcut.
+`data/t7_mystery.parquet` holds one of the five shortcuts of [physics.md](../docs/physics.md#planted-shortcuts). A first
+look at the counts per class (`jetgen info`, the truth columns) is part of the hunt and may already point at a suspect.
+The task is to show, with the tools of weeks 3 and 4 and with counterfactual edits, that a tagger trained on the file
+uses the shortcut. Then remove it, and only then run `jetgen info data/t7_mystery.parquet --reveal`.
 
 **B.4** *Bonus, 5 h.* A paper from the current research (needs **W4.2.9**). Choose one of arXiv:2412.03673,
 arXiv:2512.00210, arXiv:2605.09881 and arXiv:2401.13537. Either reproduce one figure qualitatively on the toy, or probe

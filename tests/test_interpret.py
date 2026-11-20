@@ -323,12 +323,39 @@ def test_irc_scan_shapes_and_efn_safety(jetclass_sample: JetData) -> None:
     assert collinear["mean_abs_dlogit"][2] < 1e-4  # an exact collinear split leaves the EFN unchanged
     assert collinear["mean_abs_dlogit"][0] > collinear["mean_abs_dlogit"][1] > collinear["mean_abs_dlogit"][2]
     emb = interpret.irc_scan(efn, jetclass_sample, mode="soft", values=eps, output="embedding", n_jets=30, n=3)
-    assert set(emb) == {"values", "mean_embed_dist", "std_embed_dist"}
+    assert set(emb) == {"values", "mean_embed_dist", "std_embed_dist", "mean_embed_dist_jets", "std_embed_dist_jets"}
     assert emb["mean_embed_dist"][0] > emb["mean_embed_dist"][2]
+    assert emb["mean_embed_dist_jets"][0] > emb["mean_embed_dist_jets"][2]
     fixed = interpret.irc_scan(efn, jetclass_sample, mode="soft", values=[1e-2], target=2, n_jets=20)
     assert fixed["mean_abs_dscore"].shape == (1,)
     with pytest.raises(ValueError, match="mode"):
         interpret.irc_scan(efn, jetclass_sample, mode="hard", values=[0.1])  # type: ignore[arg-type]
+
+
+def test_mean_pair_distance() -> None:
+    rng = np.random.default_rng(0)
+    x = rng.normal(size=(37, 5)) + 1e4  # a large common offset must not cost precision
+    brute = np.mean([np.linalg.norm(x[i] - x[j]) for i in range(37) for j in range(37) if i != j])
+    assert interpret._mean_pair_distance(x, chunk=8) == pytest.approx(brute, rel=1e-9)
+    assert interpret._mean_pair_distance(x[:1]) == 0.0
+
+
+def test_irc_scan_embedding_distance_to_other_jets_compares_encoders(jetclass_sample: JetData) -> None:
+    """``mean_embed_dist_jets`` is the same for an encoder whose embeddings are shifted, scaled and rotated."""
+    torch.manual_seed(0)
+    pfn = build_model("pfn")
+    kwargs: dict[str, Any] = {"mode": "collinear", "values": [1e-1, 1e-3], "output": "embedding", "n_jets": 25}
+    base = interpret.irc_scan(pfn, jetclass_sample, **kwargs)
+    embed = pfn.embed
+    width = int(embed(make_inputs(pfn, jetclass_sample.head(2))).shape[1])
+    rotation = torch.linalg.qr(torch.randn(width, width, dtype=torch.float64))[0].float()
+    offset = torch.full((width,), 40.0)
+    pfn.embed = lambda batch: 3.0 * embed(batch) @ rotation + offset  # type: ignore[method-assign]
+    moved = interpret.irc_scan(pfn, jetclass_sample, **kwargs)
+    np.testing.assert_allclose(moved["mean_embed_dist_jets"], base["mean_embed_dist_jets"], rtol=1e-4)
+    np.testing.assert_allclose(moved["std_embed_dist_jets"], base["std_embed_dist_jets"], rtol=1e-3, atol=1e-7)
+    # the old normalisation by the mean norm sees the offset: it is not comparable across encoders
+    assert not np.allclose(moved["mean_embed_dist"], base["mean_embed_dist"], rtol=0.1)
 
 
 def test_irc_scan_leaves_out_long_jets(jetclass_sample: JetData) -> None:

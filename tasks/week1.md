@@ -382,13 +382,15 @@ from itj.toy.kinematics import boost, delta_r, pt_eta_phi, rapidity, two_body
 
 n, m, pt = 1000, 80.4, 600.0
 rng = np.random.default_rng(0)
-cos, phi = rng.uniform(-1, 1, n), rng.uniform(0, 2 * np.pi, n)
+cos, phi = rng.uniform(-1, 1, n), rng.uniform(0, 2 * np.pi, n)  # quark 1: polar angle about z, azimuth
 q1, q2 = two_body(np.full(n, m), 0.0, 0.0, cos, phi)  # rest frame, (n, 4) each
+cos_star = q1[:, 0] / np.linalg.norm(q1[:, :3], axis=1)  # cos theta*: the angle of quark 1 to x, the boost axis
 beta = np.array([pt / np.hypot(pt, m), 0.0, 0.0])  # a W of this pT moving along x
 q1, q2 = boost(q1, beta), boost(q2, beta)
 ```
 
-Then `pt_eta_phi`, `rapidity` and `delta_r` give the angles.
+Then `pt_eta_phi`, `rapidity` and `delta_r` give the angles. `two_body` measures its angle `cos` from the $z$ axis
+(the beam), but the W moves along $x$, so plot against `cos_star`, not `cos`.
 
 **Deliverables:** the two hand values and the W and top masses next to `truth_mass` (**W1.1.1**); the largest
 $\lvert y - \eta\rvert$ in the jet, the `allclose` line and one sentence on why (**W1.1.2**); the derivation in three
@@ -485,7 +487,7 @@ check it against `lund_density` in one `allclose`.
 `data/t1_detector.parquet` with the truth (`itj.observables.lund_primary`). Optionally, walk the Cambridge/Aachen
 (C/A) tree of `itj.cluster.cluster(p4, mask, algorithm="ca")` yourself; this algorithm merges particles in order of
 angle. Where do hadronisation and the detector move the density? Look at low $k_t$ and at small $\Delta$,
-and think of the cell size. The C/A clustering of the 30 000 jets takes about 25 s of CPU.
+and think of the cell size. The C/A clustering of the 30 000 jets takes about 10 s of CPU.
 
 **W1.2.8** *Stretch, 30 min.* Other levels and the W plane. Draw the plane of **W1.2.7** at `shower` and `hadrons`, and
 the plane of W jets: where is the W splitting? Keep this plane in mind for week 4 (**W4.5.7**). The Particle Transformer
@@ -509,7 +511,9 @@ distribution of this angle against the double-log Sudakov factor
 
 ([physics.md](../docs/physics.md#sudakov-factor)). Here $E$ is the quark energy, $\theta_0$ the start angle and
 $k_{t,\mathrm{cut}}$ the shower cutoff. Double-log means that only the squared-logarithm terms are kept. Where does it
-fail, and why? Check your curve with `itj.toy.sudakov_cdf`.
+fail, and why? Draw `itj.toy.sudakov_cdf` as well. It is not the double log: it is the exact factor for one emission
+(the full splitting function and the exact limits of the momentum fraction $z$), which the toy follows. Use it to check
+the curve you measured from the file, and compare the double log with it.
 
 **W1.2.11** *Stretch, 60 min.* Derive it, and the gluons. Derive the Sudakov factor of **W1.2.10**[^sudakov], and repeat
 the comparison for the gluon jets of `data/t1_lund_g.parquet`.
@@ -545,9 +549,10 @@ function of the padded four-vectors of many jets. Compare it with `itj.observabl
 
 **W1.3.2** *Core, 60 min.* Mass and soft-drop mass. Plot $m$ (your **W1.3.1** mass) and $m_\mathrm{SD}$ (`jet_sdmass`)
 per process at `detector` (`data/t1_detector.parquet`) with your **W1.1.6** function. (a) Which peak is narrower for W
-and top jets? Measure the width of a peak as its full width at half maximum, or as the fraction of jets within $\pm 10$
-GeV of the peak. (b) Which W jets have $m_\mathrm{SD}$ near 0, and which top jets have $m_\mathrm{SD}$ near 80 GeV?
-(c) What does grooming remove from QCD jets? Give one number that supports each answer.
+and top jets? Measure the width of a peak in two ways: its full width at half maximum, and the fraction of jets within
+$\pm 10$ GeV of the peak. Do the two measures agree? If not, say what each one is sensitive to. (b) Which W jets have
+$m_\mathrm{SD}$ near 0, and which top jets have $m_\mathrm{SD}$ near 80 GeV? (c) What does grooming remove from QCD
+jets? Give one number that supports each answer.
 
 **W1.3.3** *Stretch, 45 min.* The underlying event and the mass. Compare `data/t1_detector.parquet` with the same events
 without the underlying event (`data/t1_detector_noue.parquet`), jet by jet. How far do the peaks of $m$ and of

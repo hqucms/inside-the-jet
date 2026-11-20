@@ -76,6 +76,61 @@ def test_encode_decode(monkeypatch):
         decode(private)
 
 
+#: Entries written by itj 0.2.0 ("x1:", the key itself), for ``encode(5)`` with the public key and, with
+#: ``ITJ_MYSTERY_KEY=123457``, for ``encode(5, {"containment_efficiency": 0.99})``.
+X1_PUBLIC = (
+    "x1:xGIsc4MCAWoEjqinXSbu7ZZVHbiORoz82snEk4I8E5ZHrUAxAooA9okvPoTfqgdXuR4PMiBLew74oAvDhqkNtz6EPttHr+5QaJAMIdr1aaJcKeOWw05L"
+    "zFs="
+)
+X1_PRIVATE = (
+    "x1:Y2b105WJb3OzZrrATRLag9xzfXgHD/Q4uuSg63kN6/v7Op7fYRMg24Ry8wVxeZhpa/fyOfBYaxu0NYFug3TMcQtvYZgOAEZ+RpKgvmCs1KMm0saRe6s5"
+    "lxNnOoqiAMcaUPDOHeX09SuFWJT6UQYCWbaE9CiR4YD/UFK1qOVPi0wR7PeNBhXU/Q=="
+)
+
+
+def test_entries_of_earlier_releases_still_decode(monkeypatch):
+    monkeypatch.delenv("ITJ_MYSTERY_KEY", raising=False)
+    payload = decode(X1_PUBLIC)
+    assert {payload["process"]: {payload["field"]: payload["value"]}} == mystery_overrides(5)
+    assert payload["key_set"] is False
+    with pytest.raises(ValueError, match="ITJ_MYSTERY_KEY"):
+        decode(X1_PRIVATE)
+    monkeypatch.setenv("ITJ_MYSTERY_KEY", "123457")
+    private = decode(X1_PRIVATE)
+    assert private["key_set"] is True
+    assert private["statistics"] == {"containment_efficiency": 0.99}
+    assert {private["process"]: {private["field"]: private["value"]}} == mystery_overrides(5)
+
+
+def test_the_key_is_stretched(monkeypatch, caplog):
+    """A new entry is scrambled with the PBKDF2-stretched key, so that every key a student tries costs a KDF."""
+    import hashlib
+
+    from itj.toy import mystery
+
+    monkeypatch.setenv("ITJ_MYSTERY_KEY", "123457")
+    text = encode(5, {"containment_efficiency": 0.99})
+    assert text.startswith("x2:")
+    raw = base64.b64decode(text[3:])
+    plain = json.dumps(decode(text), sort_keys=True).encode()
+    assert mystery._scramble(raw, 123457) == plain
+    assert mystery._scramble(raw, 123457, stretch=False) != plain  # not the stream of the bare key
+    stretched = hashlib.pbkdf2_hmac("sha256", b"123457", b"itj-mystery", mystery.KDF_ITERATIONS).hex()
+    assert mystery._stretched(123457) == stretched
+    assert mystery.KDF_ITERATIONS >= 100_000
+    # a short private key is worth a warning, a long random one and the public default are not
+    with caplog.at_level("WARNING", logger="itj.toy.mystery"):
+        encode(5)
+    assert "6 digits" in caplog.text
+    assert "secrets.randbits(64)" in caplog.text
+    caplog.clear()
+    for key in (str(2**63 + 12345), "0"):
+        monkeypatch.setenv("ITJ_MYSTERY_KEY", key)
+        with caplog.at_level("WARNING", logger="itj.toy.mystery"):
+            assert decode(encode(7))["key_set"] is (key != "0")
+    assert caplog.text == ""
+
+
 def test_hide():
     provenance = {"seed": 3, "mystery": "x1:abc", "merged": [{"path": "a", "provenance": {"mystery": "x1:def"}}, 4]}
     hidden = hide(provenance)

@@ -230,13 +230,19 @@ def _categorical_colours(view: JetView, color: str) -> tuple[list[str], dict[str
     raise ValueError(f"color must be 'type', 'prong', 'parton', 'ue' or an array, got {color!r}")
 
 
-def _value_norm(values: np.ndarray, cmap: str | None) -> tuple[str, Any]:
-    """Colour map and norm: signed values centred on 0 (RdBu_r), unsigned ones on viridis."""
+def _value_norm(values: np.ndarray, cmap: str | None, signed: bool | None = None) -> tuple[str, Any]:
+    """Colour map and norm: signed values centred on 0 (RdBu_r), unsigned ones on viridis.
+
+    ``signed=None`` decides from the values (signed if any is negative); True or False fixes the choice, so that a
+    gallery of several jets shares one colour map.
+    """
     from matplotlib.colors import Normalize
 
     finite = values[np.isfinite(values)]
-    if finite.size and finite.min() < 0:
-        vmax = float(np.max(np.abs(finite))) or 1.0
+    if signed is None:
+        signed = bool(finite.size and finite.min() < 0)
+    if signed:
+        vmax = (float(np.max(np.abs(finite))) if finite.size else 0.0) or 1.0
         return cmap or "RdBu_r", Normalize(-vmax, vmax)
     vmax = float(finite.max()) if finite.size else 1.0
     return cmap or "viridis", Normalize(0.0 if finite.size == 0 else min(0.0, float(finite.min())), vmax or 1.0)
@@ -253,6 +259,7 @@ def _draw_jet(
     show_axes: int | None,
     alpha: float = 0.85,
     cmap: str | None = None,
+    signed: bool | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     """Draw jet ``i`` on ``ax``; return (the scatter of the particles, legend handles by label)."""
     from matplotlib.lines import Line2D
@@ -284,7 +291,7 @@ def _draw_jet(
         if len(given) < len(deta):
             raise ValueError(f"color has {len(given)} values for {len(deta)} particles")
         values = given[: len(deta)]  # padded per-particle arrays are accepted
-        cmap_name, norm = _value_norm(values, cmap)
+        cmap_name, norm = _value_norm(values, cmap, signed)
         sc = ax.scatter(
             deta[order],
             dphi[order],
@@ -374,6 +381,7 @@ def jet_display(
     label: str | None = None,
     legend: bool = True,
     title: str | None = None,
+    signed: bool | None = None,
 ) -> Axes:
     """Draw one jet in the (Delta eta, Delta phi) plane: marker area proportional to pT, equal axes.
 
@@ -413,6 +421,9 @@ def jet_display(
         Draw the legend of the categorical colours and markers.
     title : str, optional
         Title (default: index, process, pT, mass and multiplicity).
+    signed : bool, optional
+        For array colours: True always uses ``RdBu_r`` centred on 0, False always ``viridis``; None (default) decides
+        from the values of this jet.
 
     Returns
     -------
@@ -421,7 +432,7 @@ def jet_display(
     """
     ax = _new_axes(ax)
     sc, handles = _draw_jet(
-        ax, data, i, color=color, size=size, show_prongs=show_prongs, show_axes=show_axes, cmap=cmap
+        ax, data, i, color=color, size=size, show_prongs=show_prongs, show_axes=show_axes, cmap=cmap, signed=signed
     )
     _decorate_display(ax, lim)
     if not isinstance(color, str) and colorbar:
@@ -932,8 +943,15 @@ def attribution_display(
     ax: Axes | None = None,
     absolute: bool = False,
     lim: float = 0.8,
+    signed: bool | None = None,
+    label: str = "attribution",
 ) -> Axes:
     """Draw jet ``i`` coloured by per-particle attributions (signed: ``RdBu_r`` centred on 0).
+
+    The colour bar says what is drawn: ``label`` followed by "(signed)" or "(absolute)". By default the colour map
+    follows the values of this one jet, so a jet whose attributions happen to be all positive is drawn on ``viridis``
+    and the others on ``RdBu_r``; pass ``signed=True`` to draw every jet of a gallery of signed attributions on the
+    same diverging map.
 
     Parameters
     ----------
@@ -949,6 +967,11 @@ def attribution_display(
         Colour by the absolute attribution (and say so on the colour bar).
     lim : float
         Half-width of the window.
+    signed : bool, optional
+        True: always ``RdBu_r`` centred on 0 (for signed attributions, also when all values of the jet are positive);
+        False: always ``viridis``; None (default): signed if any value is negative.
+    label : str
+        What the values are, for the colour bar, for example "saliency" (a gradient, not a contribution).
 
     Returns
     -------
@@ -959,10 +982,13 @@ def attribution_display(
     if a.ndim == 2:
         a = a[i]
     if absolute:
+        if signed:
+            raise ValueError("absolute=True draws |attribution|, which is not signed: drop signed=True")
         a = np.abs(a)
-    signed = bool(np.any(a < 0))
-    label = "attribution (signed)" if signed else ("attribution (absolute)" if absolute else "attribution")
-    return jet_display(data, i, color=a, ax=ax, label=label, lim=lim)
+    if signed is None:
+        signed = bool(np.any(a < 0))
+    text = f"{label} (signed)" if signed else (f"{label} (absolute)" if absolute else label)
+    return jet_display(data, i, color=a, ax=ax, label=text, lim=lim, signed=signed)
 
 
 def efn_filters(model: Any, *, n: int = 8, extent: float = 0.8, bins: int = 64) -> Figure:

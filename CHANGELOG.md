@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-20
+
+Fixes after the reference solutions of 0.2.0. The toy and its default output are unchanged: every column of every data
+file is bit-identical to 0.2.0, so the validation table, the planted shortcuts and the figures stay as they are (the
+provenance of a file records the new package version, and that of a `--mystery` file the new scrambling). The question
+IDs and tiers are those of 0.2.0.
+
+### Changed
+
+- `itj.plot.attribution_display` takes `signed` (True: always the diverging map centred on 0, also for a jet whose
+  attributions happen to be all positive; False: always `viridis`; the default still decides from the values of the
+  jet) and `label`, the name on the colour bar (for example "saliency"). `itj.plot.jet_display` passes `signed` on for
+  array colours.
+- `itj.interpret.irc_scan(..., output="embedding")` also returns `mean_embed_dist_jets` and `std_embed_dist_jets`, the
+  distance divided by the mean distance between the embeddings of two different jets. Unlike `mean_embed_dist`
+  (divided by the mean embedding norm, which carries the offset of each encoder), it does not change when the
+  embeddings are shifted, scaled or rotated, so it compares encoders.
+- The scrambled shortcut of a new `--mystery` file uses the key stretched with PBKDF2 (entries start with `x2:`), so
+  that every key a student tries costs a fraction of a second instead of about 30 microseconds; files made by 0.1.1 to
+  0.2.0 (`x1:`) and 0.1.0 still decode. `jetgen generate --mystery` warns about an `ITJ_MYSTERY_KEY` of fewer than 13
+  digits, and physics.md asks for a long random key and shows how to make one.
+- Version 0.2.1 (`itj.__version__`, CITATION.cff).
+
+### Fixed
+
+- `docs/ml_primer.md` unpacked `itj.metrics.roc` as background efficiency first; it returns the signal efficiency
+  first. The snippet now uses both names.
+- Notebook `02_first_network`: the hand-written loss of section 3 is computed from the logit, so it no longer becomes
+  `inf` or `nan` at the large step sizes that its *Try* asks for.
+- The start of W1.1.10 gives `cos_star`, the decay angle to the boost axis: the angle that `two_body` takes is measured
+  from the beam, not from the direction of the W.
+- Week 1: W1.2.10 says that `itj.toy.sudakov_cdf` is the exact single-emission factor that the toy follows, not the
+  double log; W1.3.2 asks for both measures of the width of a peak and whether they agree; the C/A clustering of
+  W1.2.7 takes about 10 s, not 25 s (measured with 3 threads at a load of 3).
+- Week 2: the hint of W2.1.2 explains why the AUC does not rank window taggers (all jets outside the window share one
+  score); W2.5.4 marks the time of the course ParT-small, taken in the start-of-week box, as indicative.
+- Week 3: the W3.4.3 skeleton seeds the initial weights (`itj.train.set_seed(0)`), and methods.md gives the toy
+  reference of a single JetCLR run as about 0.90-0.92; the untrained control and the random encoder name their seed
+  (`model.reset_parameters(seed=0)`); the W3.3.1 snippet and W3.3.2 pass `rng=0` to the perturbations; W3.2.4 needs one
+  training, the nominal PFN being the course PFN; W3.4.5 says that 4 epochs of 15 000 jets leave `partsmall_nopair`
+  under-trained.
+- Week 4: W4.1.1 compares the columns of the two data sets with those that the week-1 code read; W4.2.6 says which
+  probes are fitted where; the hint of W4.3.4 keeps the monitor views of W3.4.3 when the splits are switched off and
+  compares encoders with `mean_embed_dist_jets`; W4.4.2 gives the shares with 128 steps of integrated gradients (about 2
+  minutes: 2.1 minutes for 500 jets measured with 3 threads at a load of 3-5), 32 steps being enough for the check only,
+  and W4.5.2 asks for the completeness gap to be checked before the shares are given; the hints of W4.4.1 and W4.4.4
+  label saliency maps and give a gallery one colour map; W4.5.2 says that notebook 01 uses `target=8` (Tbqq) for its top
+  jet; the ParT-small of W4.5.8 with one pair channel takes about 14 minutes, not 6 (17 minutes measured with 3 threads
+  at a load of 2-5).
+- Bonus B.2: compare each JEPA run with its own start and run a second seed if time allows; the positions-only
+  predictor has the optimiser, schedule, batches and masks of the loop; re-estimating the BatchNorm on full jets is to
+  be judged by the linear evaluation. B.3 and physics.md give one time for the shortcut PFN, about a minute (1.5
+  minutes measured with 3 threads at a load of 3-4).
+- The primer gives the $p_T$ range of nine jets in ten of the toy files (about 440-900 GeV); "nearly all" within
+  450-900 GeV held for 86 %.
+- The docstring of `itj.interpret.integrated_gradients` quotes the measured completeness gaps of ParT (a few to 35 %
+  with 32 steps, a few per cent with 128, below 1e-3 with 512), as methods.md does.
+
 ## [0.2.0] - 2026-11-19
 
 The course is re-paced for undergraduates with no prior knowledge of jets who work on it 2-3 days per week: four weeks
@@ -245,7 +303,8 @@ Stage A: the toy "A Spray of Hadrons".
   download), and the pytest markers `weaver` and `network`.
 - Documentation and student tasks T0-T7.
 
-[Unreleased]: https://github.com/hqucms/inside-the-jet/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/hqucms/inside-the-jet/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/hqucms/inside-the-jet/releases/tag/v0.2.1
 [0.2.0]: https://github.com/hqucms/inside-the-jet/releases/tag/v0.2.0
 [0.1.1]: https://github.com/hqucms/inside-the-jet/releases/tag/v0.1.1
 [0.1.0]: https://github.com/hqucms/inside-the-jet/releases/tag/v0.1.0

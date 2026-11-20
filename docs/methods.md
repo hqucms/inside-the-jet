@@ -219,8 +219,11 @@ pair features (`pair_input_dim=1`), in the same way, and compare with errors.
 The protocol of [observables.md](observables.md#numerical-irc-tests) applies to taggers through
 `itj.interpret.irc_scan(model, data, mode="soft" | "collinear", values=...)`. It returns the mean $|\Delta s|$ of the
 score (and of the logit) against $\epsilon$ or $\delta$. With `output="embedding"` it returns instead the distance
-between the embeddings, normalised by the mean embedding norm. An EFN falls linearly to zero; a PFN (Particle Flow
-Network), ParticleNet or ParT reaches a plateau.
+between the embeddings in two normalisations. `mean_embed_dist` divides by the mean embedding norm. That norm includes
+the offset that all embeddings of one encoder share, so use it within one encoder only. `mean_embed_dist_jets` divides
+by the mean distance between the embeddings of two different jets: it does not change when an encoder's embeddings are
+shifted or scaled, so use it to compare encoders. An EFN falls linearly to zero; a PFN (Particle Flow Network),
+ParticleNet or ParT reaches a plateau.
 
 ## Mass sculpting and decorrelation
 
@@ -341,8 +344,9 @@ and with training from scratch: the two comparisons answer different questions.
 
 Expected values on JetClass (QCD, W and top), W against QCD AUC with 1 000 labels: random PFN encoder 0.860, JetCLR PFN
 after 3 epochs 0.902. With all labels the gain over the random encoder is only 0.015-0.03. On the toy (W against QCD,
-1 000 labels, three seeds): random PFN encoder 0.85, JetCLR PFN after 4 epochs 0.91-0.92. If your JetCLR encoder is
-more than 0.03 below the toy value, check the augmentations first.
+1 000 labels, three seeds): random PFN encoder 0.85, JetCLR PFN after 4 epochs about 0.90-0.92. The loop of `W3.4.3`
+has a constant learning rate, and a single run of it moves by about 0.01 with its seed. If your JetCLR encoder is more
+than 0.03 below the toy value, check the augmentations first.
 
 ## Masked particle modelling
 

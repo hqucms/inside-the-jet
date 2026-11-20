@@ -14,6 +14,7 @@ import types
 from functools import cache
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from helpers import ROOT, TASKS, WEEK_FILES, week_files_text
@@ -411,6 +412,31 @@ def test_python_snippets_import_what_they_use(path):
             k = end
         k += 1
     assert not missing, "\n".join(missing)
+
+
+def _snippet(question: str) -> str:
+    """The first Python snippet after the line of a question."""
+    text = _tasks_text()
+    start = re.search(rf"^\*\*{re.escape(question)}\*\* \*", text, re.MULTILINE)
+    assert start, question
+    return text[start.end() :].split("```python\n", 1)[1].split("\n```", 1)[0]
+
+
+def test_w1110_snippet_gives_the_decay_angle_to_the_boost_axis():
+    """The start of W1.1.10 hands out cos theta* to the axis it boosts along: Delta R is then a curve of it."""
+    from itj.toy.kinematics import delta_r, pt_eta_phi, rapidity
+
+    ns: dict = {}
+    exec(_snippet("W1.1.10"), ns)
+    q1, q2, angle = ns["q1"], ns["q2"], ns["cos_star"]
+    assert angle.shape == (ns["n"],)
+    assert np.all(np.abs(angle) <= 1.0)
+    dr = delta_r(rapidity(q1), pt_eta_phi(q1)[2], rapidity(q2), pt_eta_phi(q2)[2])
+
+    def ranks(x):
+        return np.argsort(np.argsort(x))
+
+    assert np.corrcoef(ranks(np.abs(angle)), ranks(dr))[0, 1] > 0.99
 
 
 def _module_of(dotted: str) -> str:

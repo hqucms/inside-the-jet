@@ -305,11 +305,13 @@ def integrated_gradients(
     The gap is the check of the result: when it is not small compared with ``s(x) - s(x0)``, the integrand has
     structure the quadrature does not resolve and ``steps`` must grow. ParT switches sharply along the path from the
     zero baseline (the score wiggles on a scale of 0.01 in the path parameter): on ParT-small and the pretrained ParT
-    the summed gap is 2-30 % of the summed ``|s(x) - s(x0)|`` with 32 steps, 1e-4 to 1e-2 with 128 and below 1e-6
-    with 512 steps. With respect to the four-vectors ParT is limited by float32 rounding: ``ln m^2`` of nearly
-    collinear pairs is a difference of large numbers, so the gradients are noisy and the gap of the soft baseline
-    stops falling at about 1 % in float32; ``dtype=torch.float64`` evaluates a float64 copy of the model and removes
-    that floor (soft baseline in float64: 0.02-20 % with 32 steps, below 2e-4 with 512).
+    the summed gap is a few to 35 % of the summed ``|s(x) - s(x0)|`` with 32 steps, a few per cent with 128 (often
+    carried by one jet; the median gap per jet is far smaller) and below 1e-3 with 512 steps, so use 128 steps or
+    more for attribution shares (``docs/methods.md#attributions``). With respect to the four-vectors ParT is limited
+    by float32 rounding: ``ln m^2`` of nearly collinear pairs is a difference of large numbers, so the gradients are
+    noisy and the gap of the soft baseline stops falling at about 1 % in float32; ``dtype=torch.float64`` evaluates a
+    float64 copy of the model and removes that floor (soft baseline in float64: 0.02-20 % with 32 steps, below 2e-4
+    with 512).
 
     Parameters
     ----------
@@ -518,6 +520,23 @@ def _forward_chunks(
     return {k: np.concatenate(v) if v else np.zeros(0) for k, v in out.items()}
 
 
+def _mean_pair_distance(x: np.ndarray, chunk: int = 512) -> float:
+    """Mean L2 distance between the rows of ``x`` over all pairs of different rows (0 for fewer than two rows)."""
+    n = len(x)
+    if n < 2:
+        return 0.0
+    x = np.asarray(x, dtype=np.float64)
+    x = x - x.mean(axis=0)  # distances do not change; centring avoids the cancellation of a large common offset
+    sq = (x * x).sum(axis=1)
+    total = 0.0
+    for start in range(0, n, chunk):
+        block = x[start : start + chunk]
+        d2 = sq[start : start + chunk, None] + sq[None, :] - 2.0 * block @ x.T
+        d2[np.arange(len(block)), start + np.arange(len(block))] = 0.0  # a row and itself
+        total += float(np.sqrt(np.maximum(d2, 0.0)).sum())
+    return total / (n * (n - 1))
+
+
 def irc_scan(
     model: Tagger,
     data: JetData,
@@ -572,7 +591,12 @@ def irc_scan(
     dict of str to numpy.ndarray
         "values" and, per value, for "score": "mean_abs_dscore", "std_abs_dscore" (probability of the target class)
         and "mean_abs_dlogit"; for "embedding": "mean_embed_dist", "std_embed_dist" (L2 distance of the embeddings
-        divided by the mean embedding norm of the unperturbed jets).
+        divided by the mean embedding norm of the unperturbed jets) and "mean_embed_dist_jets", "std_embed_dist_jets"
+        (the same distance divided by the mean distance between the embeddings of two different unperturbed jets).
+        The norm includes the offset that every embedding of an encoder shares, so ``mean_embed_dist`` compares
+        values within one encoder only; ``mean_embed_dist_jets`` does not change when the embeddings are shifted,
+        scaled or rotated, and compares encoders: 1 means that a perturbation moves a jet as far as the typical
+        distance to another jet.
     """
     from . import augment
 
@@ -611,11 +635,20 @@ def irc_scan(
             t = np.full(len(jets), int(target))
         rows = np.arange(len(jets))
 
+    norm = spread = 1.0
+    if embedding:
+        norm = float(np.mean(np.linalg.norm(ref["values"], axis=1))) or 1.0
+        spread = _mean_pair_distance(ref["values"]) or 1.0
+
     def summarise(values: np.ndarray) -> dict[str, float]:
         if embedding:
-            norm = float(np.mean(np.linalg.norm(ref["values"], axis=1))) or 1.0
-            dist = np.linalg.norm(values - ref["values"], axis=1) / norm
-            return {"mean_embed_dist": float(dist.mean()), "std_embed_dist": float(dist.std())}
+            dist = np.linalg.norm(values - ref["values"], axis=1)
+            return {
+                "mean_embed_dist": float((dist / norm).mean()),
+                "std_embed_dist": float((dist / norm).std()),
+                "mean_embed_dist_jets": float((dist / spread).mean()),
+                "std_embed_dist_jets": float((dist / spread).std()),
+            }
         logits_ref, logits = ref["values"], values
 
         def probs(z: np.ndarray) -> np.ndarray:

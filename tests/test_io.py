@@ -416,3 +416,19 @@ def test_root_files(tmp_path):
         f["events"] = {"x": np.ones(3)}
     with pytest.raises(ValueError, match="no tree 'tree'"):
         load(tmp_path / "other.root")
+
+
+def test_docs_quote_the_current_version():
+    """The pages that name the package version (format, toy model, citation) follow ``itj.__version__``."""
+    import re
+
+    import itj
+    from helpers import ROOT
+
+    version = itj.__version__
+    data_format = " ".join((ROOT / "docs" / "data_format.md").read_text().split())
+    assert f"format version {FORMAT_VERSION}, written by `itj` 0.1.0 to {version}." in data_format
+    physics = " ".join((ROOT / "docs" / "physics.md").read_text().split())
+    assert f"as implemented in `itj.toy` (version {version}," in physics
+    citation = (ROOT / "CITATION.cff").read_text()
+    assert re.search(rf"^version: {re.escape(version)}$", citation, re.MULTILINE)

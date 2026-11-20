@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import math
+import re
 from pathlib import Path
 
 import numpy as np
@@ -45,6 +46,29 @@ def test_roc_and_auc_equal_sklearn(scores: tuple[np.ndarray, np.ndarray, np.ndar
         np.testing.assert_array_equal(thr[1:], sk_thr[1:])
         assert thr[0] == np.inf
         assert auc(y, s, sample_weight=weight) == pytest.approx(metrics.roc_auc_score(y, s, sample_weight=weight))
+
+
+#: An unpacking of the ROC curve in the course text: ``a, b, c = roc(...)`` or ``= itj.metrics.roc(...)``.
+_ROC_UNPACK = re.compile(r"(\w+)\s*,\s*(\w+)\s*,\s*\w+\s*=\s*(?:itj\.metrics\.|metrics\.)?roc\(")
+
+
+def test_roc_is_unpacked_in_its_order_in_the_course() -> None:
+    """Every ``x, y, t = roc(...)`` of the docs, tasks, notebooks and examples names the signal efficiency first."""
+    root = Path(__file__).resolve().parents[1]
+    paths = [root / "TASKS.md", root / "README.md"]
+    for folder, pattern in (("docs", "*.md"), ("tasks", "*.md"), ("notebooks", "*.ipynb"), ("examples", "**/*.py")):
+        paths += sorted((root / folder).glob(pattern))
+    found = 0
+    for path in paths:
+        if not path.exists():
+            continue
+        for first, second in _ROC_UNPACK.findall(path.read_text(encoding="utf-8")):
+            found += 1
+            where = f"{path.relative_to(root)}: roc returns (eff_s, eff_b, thresholds), unpacked as {first}, {second}"
+            assert first.endswith("_s"), where
+            assert second.endswith("_b"), where
+    if (root / "docs").exists():
+        assert found >= 2  # the primer and examples/train_tagger.py
 
 
 def test_roc_limits() -> None:

@@ -67,10 +67,10 @@ box, **W3.1**, **W3.2** (4.75 h) / **W3.3**, **W3.4.1** (3.75 h) / **W3.4.2**-**
 **First stretch picks:** **W3.2.3** (sculpting), **W3.1.4** (the quark/gluon probe), **W3.1.5** (your own
 CKA), **W3.4.7** (few labels, in the background).
 
-**Models and data of this week.** The models are the course models of `models/course/` (or your own PFN
-of **W2.4.3**: say which). The control is an untrained ParT-small with random weights
-(`itj.models.build_model("partsmall")` after `reset_parameters()`). The data are the test part of
-`data/t2_detector.parquet` (30 000 jets) unless stated otherwise.
+**Models and data of this week.** The models are the course models of `models/course/` (or your own PFN of **W2.4.3**:
+say which). The control is an untrained ParT-small with random weights (`itj.models.build_model("partsmall")`, then
+`model.reset_parameters(seed=0)`; 0 is the default seed, and naming it records the seed for your hand-in). The data
+are the test part of `data/t2_detector.parquet` (30 000 jets) unless stated otherwise.
 
 ## Data for week 3
 
@@ -194,9 +194,9 @@ PFN with planing weights: weights per jet that make $m_\mathrm{SD}$ flat in each
 20 bins in [40, 250] GeV. A jet in bin $b$ of its class gets $w = (n_\mathrm{in}/20)/n_b$, with $n_\mathrm{in}$ jets of
 the class in the range and $n_b$ in the bin. Every filled bin then carries the same total weight. A jet outside the
 range gets $w = 1$. Then normalise the weights per class to the number of jets of the class, cap them at 10 and pass
-them with `JetDataset(weights=...)`. Plot $R_{50}$ against $1/\mathrm{JSD}$ for both PFNs (2 trainings of about 2-3
-minutes). Expect only a partial decorrelation (20 bins with a cap of 10 flatten the W peak only in part), and say what
-that does to your answer.
+them with `JetDataset(weights=...)`. Plot $R_{50}$ against $1/\mathrm{JSD}$ for both PFNs (one training of about 2-3
+minutes: the nominal PFN is the course PFN of `models/course/`). Expect only a partial decorrelation (20 bins with a
+cap of 10 flatten the W peak only in part), and say what that does to your answer.
 
 **W3.2.5** *Stretch, 45 min.* Two-prong jets at other masses. Evaluate both PFNs of **W3.2.4** on `data/t3_w60.parquet`,
 `data/t3_w80.parquet`, `data/t3_w100.parquet` and `data/t3_w120.parquet`: does the decorrelated tagger still tag these
@@ -250,7 +250,7 @@ import itj.observables
 from itj.io import load
 
 jets = load("data/t1_detector.parquet").head(1000)
-soft = itj.augment.add_soft(jets, eps=1e-3, substructure=True)  # new part_* columns
+soft = itj.augment.add_soft(jets, eps=1e-3, substructure=True, rng=0)  # new part_* columns; rng: reproducible
 values = itj.observables.compute(soft, ["mass", "multiplicity"])
 ```
 
@@ -258,10 +258,11 @@ values = itj.observables.compute(soft, ["mass", "multiplicity"])
 and $p_T^D = \sqrt{\sum_i z_i^2}$ (the momentum fractions $z_i$ of the particles squared and summed;
 [observables.md](../docs/observables.md#angularities-and-pt_d)) are IRC safe? Then perturb the 1 000 jets in two ways,
 both with `substructure=True`: with soft particles (`add_soft`), and with collinear splits
-(`itj.augment.split_collinear`, momentum share $\lambda = 0.5$ and 0.2, separation $\delta = 10^{-1}, \ldots, 10^{-5}$).
-Plot the mean relative change of the five observables (`compute(data, ["mass", "sdmass", "tau2", "multiplicity",
-"ptd"])`, about 25 s) against $\epsilon$ and $\delta$, and classify each as safe or unsafe. Then check your
-classification against [observables.md](../docs/observables.md#irc-safety).
+(`itj.augment.split_collinear`, momentum share $\lambda = 0.5$ and 0.2, separation $\delta = 10^{-1}, \ldots, 10^{-5}$;
+pass `rng=0` to both, as in **W3.3.1**, so that the scan is reproducible). Plot the mean relative change of the five
+observables (`compute(data, ["mass", "sdmass", "tau2", "multiplicity", "ptd"])`, about 25 s) against $\epsilon$ and
+$\delta$, and classify each as safe or unsafe. Then check your classification against
+[observables.md](../docs/observables.md#irc-safety).
 
 **W3.3.3** *Core, 60 min.* Augmentations are symmetries. An augmentation is a change of a jet that should not change
 what the jet is ([ml_primer](../docs/ml_primer.md#learning-without-labels)). Apply `itj.augment.rotate`, `smear_soft`
@@ -346,10 +347,12 @@ import torch
 import itj.features
 import itj.models
 import itj.ssl
+import itj.train
 from itj.io import load
 
 jets = load("data/t6_pretrain.parquet").drop("label_", "truth_", "aux_")  # never look at the labels
 train, val, test = itj.features.split(load("data/t2_detector.parquet"))  # labelled jets, for the evaluation only
+itj.train.set_seed(0)  # the initial weights; record your seeds
 encoder = itj.models.build_model("pfn")
 head = itj.ssl.ProjectionHead(128, 128, 64)
 opt = torch.optim.AdamW([*encoder.parameters(), *head.parameters()], lr=1e-3)
@@ -374,15 +377,15 @@ itj.ssl.linear_eval(encoder, train, val, n_labels=1000)
 
 **W3.4.4** *Core, 45 min.* What did it learn? Freeze the encoder and train a logistic regression on its embedding with
 1 000 labels from the train part of `data/t2_detector.parquet`. Test it on the test part
-(`itj.ssl.linear_eval(encoder, train, test,
-n_labels=1000)`, about a minute). Do the same for the random encoder
-(`reset_parameters`) and for the course PFN, with the same logistic regression. Where does the pretraining help, and
-where not?
+(`itj.ssl.linear_eval(encoder, train, test, n_labels=1000)`, about a minute). Do the same for the random encoder
+(`model.reset_parameters(seed=0)`) and for the course PFN, with the same logistic regression. Where does the pretraining
+help, and where not?
 
 **W3.4.5** *Stretch, 75 min.* Your own loop, longer and other encoders. Write the pretraining loop without the skeleton.
 Then run it for 10 epochs (about 7 minutes, in the background): does the linear evaluation keep improving? Then
 pretrain `partsmall_nopair` for 4 epochs on 15 000 jets, also in the background (on 30 000 jets it takes about 21
-minutes).
+minutes). Four epochs of 15 000 jets are only about 230 steps of 256 jets, so this encoder is under-trained by design:
+judge it by how its linear evaluation moves over the epochs, not by its final value.
 
 **W3.4.6** *Stretch, 2 h.* Against the observables, and truth probes. Run the linear evaluation with all labels. Add the
 baselines of the standardised observables $X_\mathrm{phys} = [m_\mathrm{SD}, \tau_{21}, \tau_{32}, D_2, N, \ln p_T]$,

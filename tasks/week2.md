@@ -138,7 +138,10 @@ the first rows of the table (**W2.1.2**); the optimised rows (**W2.1.3**).
   $1 - \tau_{21}$ (notebook 00_quickstart). Before you compute the ROC curve, keep only the two classes of a comparison
   (W and QCD, or top and QCD). `bootstrap` takes the metric as its first argument: `auc_mean, auc_err =
   itj.metrics.bootstrap(itj.metrics.auc, y, s)`, and `itj.metrics.rejection(y, s, 0.5)` gives $R_{50}$. The top $R_{50}$
-  rests on few QCD jets: give the rejection at $\epsilon_S = 0.8$ as well, and say how many QCD jets pass.
+  rests on few QCD jets: give the rejection at $\epsilon_S = 0.8$ as well, and say how many QCD jets pass. All jets
+  outside the window share the lowest score, so the ROC curve of a window tagger stops at the efficiency of the window
+  and goes on as a straight line to (1, 1). That line counts in the AUC: compare cut taggers at a working point such as
+  $R_{50}$, not by the AUC alone.
 
 ## W2.2 Boosted decision trees (core path about 1.25 h, stretch about 1.5 h)
 
@@ -338,9 +341,12 @@ curve returns in **W3.4.7**.
 
 **W2.5.4** *Stretch, 60 min.* Seeds, the transformer and the time axis. For the curves of **W2.5.3**, add three seeds at
 the sizes below 10 000 jets, and ParT-small at 30 000 (the course model). Draw the curves against the training time as
-well. Do they cross, against the training size and against the training time, and if so where? Then measure the
-inference speed of every tagger (how fast a trained model scores new jets) in jets per second, with `torch.no_grad()`,
-on one thread and on all threads. Add it as a column of the **W2.5.2** cost table.
+well. The time of the course ParT-small comes from the start-of-week box, with its own thread count and with your work
+running beside it, so it is not on the same footing as the times of your own runs. Mark it as indicative, or time one
+epoch of the same recipe yourself at the thread count of your curves and multiply by its five epochs. Do the curves
+cross, against the training size and against the training time, and if so where? Then measure the inference speed of
+every tagger (how fast a trained model scores new jets) in jets per second, with `torch.no_grad()`, on one thread and on
+all threads. Add it as a column of the **W2.5.2** cost table.
 
 **W2.5.5** *Stretch, 30 min + GPU time.* Larger transformers. *Optional (GPU):* `partlite`, or more training data, on a
 GPU ([examples/cluster](../examples/cluster/README.md)).

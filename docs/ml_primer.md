@@ -86,7 +86,8 @@ print(f"cut at {c}: eff_S = {eff_s:.3f}, eff_B = {eff_b:.4f}, rejection = {1 / e
 
 y = np.concatenate([np.ones(5000), np.zeros(5000)])  # the labels: 1 signal, 0 background
 s = np.concatenate([s_sig, s_bkg])
-eps_b, eps_s, thresholds = itj.metrics.roc(y, s)  # the whole curve
+eff_s, eff_b, thresholds = itj.metrics.roc(y, s)  # the whole curve: eff_S first, then eff_B
+print(f"at eff_S = 0.5 the curve gives eff_B = {np.interp(0.5, eff_s, eff_b):.4f}")
 print(f"AUC = {itj.metrics.auc(y, s):.3f}, R50 = {itj.metrics.rejection(y, s, 0.5):.1f}")
 ```
 

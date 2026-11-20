@@ -3,17 +3,20 @@
 A planted shortcut is one configuration field changed for one process only: the jets of that process then carry a
 feature that a tagger can learn although it has nothing to do with the physics of the class. ``--mystery`` picks
 one of :data:`SHORTCUTS` from the seed, generates the file with it as a per-process override and stores the choice
-only in ``provenance["mystery"]``, scrambled (JSON XORed with a SHA-256 stream of the key, then base64): it is not
-in the stored configuration, not in ``provenance["process_overrides"]``, not in ``jetgen info`` (``--provenance``
-prints a placeholder) and cannot be read with a base64 decoder. The run statistics that a shortcut changes
-(:data:`RUN_STATISTICS`: the containment efficiency of ``hard_w``, the capped kT fraction of ``wide_top``, the stage
-times of ``busy_w``) go into the scrambled entry as well (:func:`plant`). :func:`reveal` unscrambles it
+only in ``provenance["mystery"]``, scrambled (JSON XORed with a SHA-256 stream of the stretched key, then base64): it
+is not in the stored configuration, not in ``provenance["process_overrides"]``, not in ``jetgen info``
+(``--provenance`` prints a placeholder) and cannot be read with a base64 decoder. The run statistics that a shortcut
+changes (:data:`RUN_STATISTICS`: the containment efficiency of ``hard_w``, the capped kT fraction of ``wide_top``, the
+stage times of ``busy_w``) go into the scrambled entry as well (:func:`plant`). :func:`reveal` unscrambles it
 (``jetgen info --reveal``).
 
 The scrambling is not encryption. Reading this module spoils B.3: the mapping from the seed to the shortcut and
 the default key are public. An instructor who wants a real hunt sets the environment variable ``ITJ_MYSTERY_KEY``
-to a private integer before generating the students' files; both the mapping and the scrambling then depend on it,
-and ``--reveal`` needs the same key (``docs/physics.md#planted-shortcuts``).
+to a long private random integer (``python -c "import secrets; print(secrets.randbits(64))"``) before generating the
+students' files; both the mapping and the scrambling then depend on it, and ``--reveal`` needs the same key
+(``docs/physics.md#planted-shortcuts``). A wrong key fails to decode, so a short key can be found by trying keys one
+after another: the key is stretched with PBKDF2 (:data:`KDF_ITERATIONS`, a fraction of a second per try) to slow this
+down, and :func:`encode` warns about a key below :data:`SHORT_KEY`.
 """
 
 from __future__ import annotations
@@ -21,8 +24,10 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import os
 from collections.abc import Mapping
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -55,9 +60,20 @@ HIDDEN = "<hidden: jetgen info --reveal>"
 #: the scrambled entry.
 RUN_STATISTICS = ("containment_efficiency", "hadron_kt_capped", "stage_times_s")
 
-#: Prefix of a scrambled entry (files written before the scrambling, itj 0.1.0 of 2026-11-05, hold plain base64 of JSON,
-#: which :func:`decode` still reads).
-_SCRAMBLED = "x1:"
+#: Prefix of a scrambled entry: "x2:" (itj 0.2.1 on) uses the key stretched with PBKDF2, "x1:" (itj 0.1.1 to 0.2.0)
+#: the key itself. :func:`decode` reads both, and the plain base64 of JSON of the files written before the scrambling
+#: (itj 0.1.0 of 2026-11-05).
+_SCRAMBLED = "x2:"
+_SCRAMBLED_X1 = "x1:"
+
+#: PBKDF2-HMAC-SHA256 iterations of the key stretching (about 0.3 s on a 2016 CPU): every key that a student tries
+#: costs this much, instead of the 30 microseconds of a bare decode.
+KDF_ITERATIONS = 600_000
+
+#: :func:`encode` warns about a non-zero key below this value: it could be found by trying keys.
+SHORT_KEY = 10**12
+
+_log = logging.getLogger(__name__)
 
 
 def _key() -> int:
@@ -97,10 +113,20 @@ def mystery_overrides(seed: int) -> dict[str, dict[str, object]]:
     return {process: {name: value}}
 
 
-def _scramble(raw: bytes, key: int) -> bytes:
-    """XOR ``raw`` with a SHA-256 counter stream of ``key`` (its own inverse)."""
+@lru_cache(maxsize=8)
+def _stretched(key: int) -> str:
+    """Return the key stretched with PBKDF2-HMAC-SHA256 (:data:`KDF_ITERATIONS` iterations), as hex."""
+    return hashlib.pbkdf2_hmac("sha256", str(key).encode(), b"itj-mystery", KDF_ITERATIONS).hex()
+
+
+def _scramble(raw: bytes, key: int, *, stretch: bool = True) -> bytes:
+    """XOR ``raw`` with a SHA-256 counter stream of the stretched ``key`` (its own inverse).
+
+    ``stretch=False`` is the stream of the key itself, that of the "x1:" entries of itj 0.1.1 to 0.2.0.
+    """
+    secret = _stretched(key) if stretch else str(key)
     stream = b"".join(
-        hashlib.sha256(f"itj-mystery:{key}:{block}".encode()).digest() for block in range(len(raw) // 32 + 1)
+        hashlib.sha256(f"itj-mystery:{secret}:{block}".encode()).digest() for block in range(len(raw) // 32 + 1)
     )
     return bytes(a ^ b for a, b in zip(raw, stream[: len(raw)], strict=True))
 
@@ -110,11 +136,19 @@ def encode(seed: int, statistics: Mapping[str, Any] | None = None) -> str:
 
     ``statistics`` (the :data:`RUN_STATISTICS` of the run) are scrambled with the shortcut.
     """
+    key = _key()
+    if 0 < key < SHORT_KEY:
+        _log.warning(
+            "%s has only %d digits: a short key can be found by trying keys; use a long random one, for example "
+            '`python -c "import secrets; print(secrets.randbits(64))"`',
+            KEY_VARIABLE,
+            len(str(key)),
+        )
     name, process, field, value = SHORTCUTS[_index(int(seed))]
-    payload: dict[str, Any] = {"name": name, "process": process, "field": field, "value": value, "key_set": _key() != 0}
+    payload: dict[str, Any] = {"name": name, "process": process, "field": field, "value": value, "key_set": key != 0}
     if statistics:
         payload["statistics"] = dict(statistics)
-    raw = _scramble(json.dumps(payload, sort_keys=True).encode(), _key())
+    raw = _scramble(json.dumps(payload, sort_keys=True).encode(), key)
     return _SCRAMBLED + base64.b64encode(raw).decode("ascii")
 
 
@@ -147,14 +181,15 @@ def plant(provenance: Mapping[str, Any], seed: int) -> dict[str, Any]:
 
 def decode(text: str) -> dict[str, Any]:
     """Decode a ``provenance["mystery"]`` entry (inverse of :func:`encode`, with the key of ``ITJ_MYSTERY_KEY``)."""
-    scrambled = text.startswith(_SCRAMBLED)
-    body = text[len(_SCRAMBLED) :] if scrambled else text
+    prefix = next((p for p in (_SCRAMBLED, _SCRAMBLED_X1) if text.startswith(p)), "")
+    scrambled = bool(prefix)
+    body = text[len(prefix) :]
     try:
         raw = base64.b64decode(body.encode("ascii"), validate=True)
     except (ValueError, UnicodeError) as error:
         raise ValueError(f"cannot decode the mystery entry {text[:20]!r}...: {error}") from None
     try:
-        payload = json.loads((_scramble(raw, _key()) if scrambled else raw).decode())
+        payload = json.loads((_scramble(raw, _key(), stretch=prefix == _SCRAMBLED) if scrambled else raw).decode())
     except (ValueError, UnicodeError):
         if scrambled:
             raise ValueError(

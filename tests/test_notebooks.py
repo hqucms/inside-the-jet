@@ -73,3 +73,24 @@ def test_notebook_runs(path, tmp_path, monkeypatch):
         assert (tmp_path / "data" / "quickstart_notebook.parquet").exists()
     elif path.stem == "01_jetclass":
         assert "Using the 150 JetClass jets of tests/data instead." in text
+
+
+def test_hand_written_loss_of_notebook_02_stays_finite():
+    """The loss of section 3 of 02_first_network is the cross-entropy, and finite at the step sizes of its *Try*."""
+    torch = pytest.importorskip("torch")
+    nb = json.loads((ROOT / "notebooks" / "02_first_network.ipynb").read_text(encoding="utf-8"))
+    sources = ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
+    cell = next(source for source in sources if "range(n_steps)" in source)
+    loop = cell.split("\nprint(")[0]  # the loop, without the printout and the figure
+    generator = torch.Generator().manual_seed(0)
+    x_train = torch.rand(500, 2, generator=generator) * torch.tensor([2.0, 1.0])
+    y_train = (x_train[:, 0] + 0.3 * torch.randn(500, generator=generator) > 1.0).float()
+    for n_steps, eta in ((300, 1.0), (300, 50.0)):
+        ns = {"torch": torch, "x_train": x_train, "y_train": y_train}
+        exec(loop.replace("n_steps, eta = 300, 1.0", f"n_steps, eta = {n_steps}, {eta}"), ns)
+        losses = torch.tensor(ns["losses"])
+        assert len(losses) == n_steps
+        assert torch.isfinite(losses).all(), f"eta = {eta}: {int((~torch.isfinite(losses)).sum())} non-finite losses"
+        # the loss of the last step, at the weights before that step's update (the logit z of the loop)
+        expected = torch.nn.functional.binary_cross_entropy_with_logits(ns["z"], y_train)
+        assert float(ns["loss"]) == pytest.approx(float(expected), rel=1e-5, abs=1e-6)

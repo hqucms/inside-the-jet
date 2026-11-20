@@ -4,7 +4,7 @@
 explains in words what a file holds, the padding and the chunks.
 
 Every run of `jetgen generate` (or `save()` in Python) writes one Parquet file with one row per jet. Parquet is a
-standard file format for tables. This page describes format version 1, written by `itj` 0.1.0 to 0.2.0. The columns are
+standard file format for tables. This page describes format version 1, written by `itj` 0.1.0 to 0.2.1. The columns are
 those of JetClass (the public data set of simulated jets, see [jetclass.md](jetclass.md)), with the same names, dtypes
 (data types) and meaning. The toy's truth columns follow them. The toy files and the JetClass files are read by one
 reader (`itj.io.load`). They share one set of network inputs and one data configuration of weaver (the training
